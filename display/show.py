@@ -2,7 +2,7 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from transmission.serialModule import SerialModule
-from audio.playAudio import AudioPlayerModule
+from audio.audioPlayer import AudioPlayerModule
 from etc.define import *
 
 from PIL import Image
