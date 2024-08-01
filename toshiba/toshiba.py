@@ -1,8 +1,13 @@
 import ctypes
 from ctypes import c_void_p, c_short, c_int, POINTER, Structure
 
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from etc.define import *
+
 # Load the Toshiba Voice Trigger library
-toshiba_vt = ctypes.CDLL('./libVT_ARML64h.so')  
+toshiba_vt = ctypes.CDLL(ToshibaVoiceLibrary)  
 
 # Define the necessary structures and enums
 class VTAPIHandle(Structure):
