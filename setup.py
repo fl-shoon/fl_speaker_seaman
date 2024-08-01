@@ -49,7 +49,7 @@ class RaspberryPiSetup:
             "openai",
             "PyAudio",
             "rx",
-            "pillow",
+            "Pillow",
             "numpy"
         ]
         for package in packages:
