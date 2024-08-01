@@ -136,10 +136,10 @@ def main():
 
     except KeyboardInterrupt:
         print("Stopping...")
-        display.send_white_frames()
+        display.display.send_white_frames()
     finally:
         recorder.delete()
-        display.close()
+        display.display.close()
 
 if __name__ == '__main__':
     main()
