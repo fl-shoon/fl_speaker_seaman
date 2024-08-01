@@ -13,6 +13,7 @@ ASSETS_DIR = os.path.join(PARENT_DIR, 'assets')
 AUDIO_DIR = os.path.join(ASSETS_DIR, 'audio')
 IMAGE_DIR = os.path.join(ASSETS_DIR, 'images')
 GIF_DIR = os.path.join(ASSETS_DIR, 'gifs')
+VOICE_TRIGGER_DIR = os.path.join(ASSETS_DIR, 'gifs')
 
 # Define the temporary ai output audio file
 TEMP_AUDIO_FILE = os.path.join(AUDIO_DIR, 'output.wav')
@@ -65,3 +66,8 @@ AIOutputAudio = TEMP_AUDIO_FILE
 SpeakingGif = os.path.join(GIF_DIR, "speakingGif.gif")
 SeamanLogo = os.path.join(IMAGE_DIR, "logo.png")
 SatoruHappy = os.path.join(IMAGE_DIR, "happy.png")
+
+# voice trigger 
+PicoLangModel = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_language_model_ja.pv")
+PicoWakeWordHello = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_wake_word_konnichiwa.ppn")
+ToshibaVoiceDictionary = os.path.join(VOICE_TRIGGER_DIR,"toshiba_voice_dict_jaJP.vtdic")

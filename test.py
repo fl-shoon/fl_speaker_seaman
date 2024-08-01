@@ -1,5 +1,5 @@
 # SetUp OS & Libraries
-from set_up import RaspberryPiSetup
+from setup import RaspberryPiSetup
 
 # Serial/Display
 from display.show import DisplayModule
@@ -19,9 +19,6 @@ import argparse, numpy as np, threading, time, wave
 from datetime import datetime
 
 def main():
-    setup = RaspberryPiSetup()
-    setup.setup()
-    
     parser = argparse.ArgumentParser()
     display = DisplayModule()
     aiClient = OpenAIModule()
