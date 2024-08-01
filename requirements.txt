@@ -1,0 +1,8 @@
+pyserial
+pygame
+pvrecorder
+openai
+pyaudio
+rx
+pillow
+numpy

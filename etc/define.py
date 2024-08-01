@@ -1,0 +1,67 @@
+import os, pyaudio
+
+# Get the current directory
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Get the parent directory
+PARENT_DIR = os.path.dirname(CURRENT_DIR)
+
+# Define the assets directory
+ASSETS_DIR = os.path.join(PARENT_DIR, 'assets')
+
+# Define subdirectories for different types of assets
+AUDIO_DIR = os.path.join(ASSETS_DIR, 'audio')
+IMAGE_DIR = os.path.join(ASSETS_DIR, 'images')
+GIF_DIR = os.path.join(ASSETS_DIR, 'gifs')
+
+# Define the temporary ai output audio file
+TEMP_AUDIO_FILE = os.path.join(AUDIO_DIR, 'output.wav')
+
+# Function to get all files with a specific extension in a directory
+def get_files_with_extension(directory, extension):
+    return [f for f in os.listdir(directory) if f.endswith(extension)]
+
+# Function to create an empty WAV file
+def create_empty_wav_file(file_path):
+    import wave
+    with wave.open(file_path, 'w') as wav_file:
+        wav_file.setnchannels(1)  # Mono
+        wav_file.setsampwidth(2)  # 2 bytes per sample
+        wav_file.setframerate(44100)  # 44.1kHz sampling rate
+        wav_file.writeframes(b'')  # Empty audio data
+
+# Check if temporary audio file exists, create it if it doesn't
+if not os.path.exists(TEMP_AUDIO_FILE):
+    create_empty_wav_file(TEMP_AUDIO_FILE)
+
+# Get lists of files
+AUDIO_FILES = [os.path.basename(TEMP_AUDIO_FILE)] + [f for f in get_files_with_extension(AUDIO_DIR, '.wav') if f != os.path.basename(TEMP_AUDIO_FILE)]
+IMAGE_FILES = get_files_with_extension(IMAGE_DIR, '.png') + get_files_with_extension(IMAGE_DIR, '.jpg')
+GIF_FILES = get_files_with_extension(GIF_DIR, '.gif')
+
+# Create dictionaries mapping filenames to full paths
+AUDIO_PATHS = {file: os.path.join(AUDIO_DIR, file) for file in AUDIO_FILES}
+IMAGE_PATHS = {file: os.path.join(IMAGE_DIR, file) for file in IMAGE_FILES}
+GIF_PATHS = {file: os.path.join(GIF_DIR, file) for file in GIF_FILES}
+
+# Audio settings
+CHUNK = 1024
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
+RECORD_SECONDS = 8
+
+# Serial/Display Settings
+BautRate = '230400'
+USBPort = '/dev/ttyACM0'
+
+# File Locations
+# =========================
+# conversation
+TriggerAudio = os.path.join(AUDIO_DIR, "trigger.wav")
+AIOutputAudio = TEMP_AUDIO_FILE
+
+# display
+SpeakingGif = os.path.join(GIF_DIR, "speakingGif.gif")
+SeamanLogo = os.path.join(IMAGE_DIR, "logo.png")
+SatoruHappy = os.path.join(IMAGE_DIR, "happy.png")
