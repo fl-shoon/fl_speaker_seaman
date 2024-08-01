@@ -36,7 +36,7 @@ def main():
     # Initialize PvRecorder with the same frame size as Toshiba Voice Trigger
     recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
 
-    display.play_trigger_with_logo(display, TriggerAudio, SeamanLogo)
+    display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
     try:
         while True:
@@ -69,7 +69,7 @@ def main():
 
             while conversation_active:
                 stop_display = threading.Event()
-                display_thread = threading.Thread(target=display.display_image, args=(display, SatoruHappy, stop_display))
+                display_thread = threading.Thread(target=display.display_image, args=(SatoruHappy, stop_display))
                 display_thread.start()
 
                 play_audio_client = pyaudio.PyAudio()
@@ -118,7 +118,7 @@ def main():
                 response_file, conversation_ended = aiClient.process_audio(AIOutputAudio)
 
                 if response_file:
-                    display.sync_audio_and_gif(display, response_file, SpeakingGif)
+                    display.sync_audio_and_gif(response_file, SpeakingGif)
                     if conversation_ended:
                         print("AI has determined the conversation has ended.")
                         conversation_active = False
@@ -131,7 +131,7 @@ def main():
                     print("No response generated. Resuming wake word detection.")
                     conversation_active = False
 
-            display.fade_in_logo(display, SeamanLogo)   
+            display.fade_in_logo(SeamanLogo)   
             print("Conversation ended. Returning to wake word detection.")
 
     except KeyboardInterrupt:
