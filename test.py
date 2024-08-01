@@ -1,21 +1,27 @@
+# SetUp OS & Libraries
+from set_up import RaspberryPiSetup
+
 # Serial/Display
-from scripts.merge.display.show import DisplayModule
+from display.show import DisplayModule
 
 # AI
-from scripts.merge.openAI.conversation import OpenAIModule
+from openAI.conversation import OpenAIModule
 
 # Voice Trigger & Recording 
-from scripts.merge.toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
+from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
 from pvrecorder import PvRecorder 
 
 # Variables
-from scripts.merge.etc.define import *
+from etc.define import *
 
 # others
 import argparse, numpy as np, threading, time, wave
 from datetime import datetime
 
 def main():
+    setup = RaspberryPiSetup()
+    setup.setup()
+    
     parser = argparse.ArgumentParser()
     display = DisplayModule()
     aiClient = OpenAIModule()
