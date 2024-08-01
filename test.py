@@ -22,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser()
     display = DisplayModule()
     aiClient = OpenAIModule()
-    parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', required=True)
+    parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
     parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
     args = parser.parse_args()
 

@@ -1,4 +1,4 @@
-from scripts.merge.audio.playerModule import PyMixerModule
+from playerModule import PyMixerModule
 
 class AudioPlayerModule:
     def __init__(self):

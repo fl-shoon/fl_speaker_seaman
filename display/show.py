@@ -1,6 +1,9 @@
-from scripts.merge.serial.serialModule import SerialModule
-from scripts.merge.audio.playAudio import AudioPlayerModule
-from scripts.merge.etc.define import *
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from transmission.serialModule import SerialModule
+from audio.playAudio import AudioPlayerModule
+from etc.define import *
 
 from PIL import Image
 import time, io, threading

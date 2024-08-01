@@ -35,6 +35,12 @@ fi
 # Activate virtual environment
 source .venv/bin/activate
 
+# Export environment variables
+export OPENAI_API_KEY='key'
+# Add more environment variables as needed, for example:
+# export ANOTHER_API_KEY='another_key'
+# export CONFIG_PATH='/path/to/config'
+
 # Function to run the main program
 run_main_program() {
     echo "Starting AI Speaker System..."
