@@ -14,7 +14,7 @@ from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
 from pvrecorder import PvRecorder 
 
 # Audio
-from audio.player import sync_audio_and_gif
+from audio.player import play_audio, sync_audio_and_gif
 from audio.recorder import record_audio
 
 # Variables
@@ -22,6 +22,19 @@ from etc.define import *
 
 def main():
     serial_module = SerialModule(BautRate)
+    
+    def ensure_serial_connection():
+        if not serial_module.is_open():
+            print("Serial connection closed. Attempting to reopen...")
+            for attempt in range(3):  # Try to reopen 3 times
+                if serial_module.open(USBPort):
+                    print("Successfully reopened serial connection.")
+                    return True
+                time.sleep(1)
+            print("Failed to reopen serial connection. Exiting.")
+            sys.exit(1)
+        return True
+
     if not serial_module.open(USBPort):  
         print("Failed to open serial port. Exiting.")
         sys.exit(1)
@@ -43,6 +56,7 @@ def main():
 
     recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
 
+    ensure_serial_connection()
     display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
     try:
@@ -64,7 +78,10 @@ def main():
                 except OSError as e:
                     print(f"Stream error: {e}. Reopening stream.")
                     recorder.stop()
+                    recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
+                    recorder.start()
 
+            ensure_serial_connection()
             ai_client.reset_conversation()
             
             conversation_active = True
@@ -72,10 +89,12 @@ def main():
             max_silence = 2
 
             while conversation_active:
+                ensure_serial_connection()
                 display.start_listening_animation()
 
                 frames = record_audio(vt.frame_size)
 
+                ensure_serial_connection()
                 display.stop_animation()
 
                 if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
@@ -94,6 +113,7 @@ def main():
                 response_file, conversation_ended = ai_client.process_audio(AIOutputAudio)
 
                 if response_file:
+                    ensure_serial_connection()
                     sync_audio_and_gif(display, response_file, SpeakingGif)
                     if conversation_ended:
                         print("AI has determined the conversation has ended.")
@@ -107,6 +127,7 @@ def main():
                     print("No response generated. Resuming wake word detection.")
                     conversation_active = False
 
+            ensure_serial_connection()
             display.fade_in_logo(SeamanLogo)   
             print("Conversation ended. Returning to wake word detection.")
 
