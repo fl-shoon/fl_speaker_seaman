@@ -93,12 +93,12 @@ def main():
 
             while conversation_active:
                 ensure_serial_connection()
-                display.start_listening_animation()
+                display.start_listening_animation(SpeakingGif)
 
                 frames = record_audio(vt.frame_size)
 
                 ensure_serial_connection()
-                display.stop_animation()
+                display.stop_listening_animation()
 
                 if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
                     print("Recording was incomplete. Skipping processing.")
@@ -113,7 +113,7 @@ def main():
                     wf.setframerate(RATE)
                     wf.writeframes(b''.join(frames))
 
-                response_file, conversation_ended = ai_client.process_audio(AIOutputAudio)
+                response_file, conversation_ended = ai_client.process_audio(AIOutputAudio, AIOutputAudio)
 
                 if response_file:
                     ensure_serial_connection()
