@@ -129,7 +129,7 @@ def main():
 
                     print("Sending white frames...")
                     white_frame_start_time = time.time()
-                    white_frame_timeout = 10  # 10 seconds timeout for sending white frames
+                    white_frame_timeout = 15  # Increase timeout to 15 seconds
                     try:
                         white_frame_success = display.serial.send_white_frames()
                         if white_frame_success:
@@ -141,6 +141,7 @@ def main():
                             raise TimeoutError("White frame sending timed out")
                     except Exception as e:
                         print(f"Error sending white frames: {str(e)}")
+                        print("Attempting to continue despite white frame error...")
 
                     print("Saving recorded audio...")
                     try:
