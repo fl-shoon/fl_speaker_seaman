@@ -12,13 +12,9 @@ from pvrecorder import PvRecorder
 from etc.define import *
 
 # others
-import argparse
+import argparse, time, wave, pyaudio, queue
 import numpy as np
-import threading
-import time
-import wave
 from datetime import datetime
-import pyaudio
 
 def main():
     parser = argparse.ArgumentParser()
@@ -38,6 +34,7 @@ def main():
     recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
 
     display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+    display.start_display_thread()
 
     time.sleep(1)
 
@@ -74,10 +71,13 @@ def main():
                 continue
 
             conversation_active = True
+            silence_count = 0
+            max_silence = 2
+            conversation_start_time = time.time()
 
             while conversation_active:
                 try:
-                    display.start_display_thread(SatoruHappy)
+                    display.queue_image(SatoruHappy)
 
                     play_audio_client = pyaudio.PyAudio()
                     stream = play_audio_client.open(format=FORMAT,
@@ -114,8 +114,12 @@ def main():
                     play_audio_client.terminate()
                     print("Audio stream stopped and closed.")
 
-                    print("Stopping display thread...")
-                    display.stop_display_thread(timeout=5)
+                    print("Clearing display queue...")
+                    while not display.display_queue.empty():
+                        try:
+                            display.display_queue.get_nowait()
+                        except queue.Empty:
+                            break
 
                     print("Sending white frames...")
                     white_frame_start_time = time.time()
@@ -133,7 +137,59 @@ def main():
                         print(f"Error sending white frames: {str(e)}")
                         print("Attempting to continue despite white frame error...")
 
-                    # ... (rest of the conversation loop, including AI processing and response playback)
+                    print("Saving recorded audio...")
+                    try:
+                        start_time = time.time()
+                        with wave.open(AIOutputAudio, 'wb') as wf:
+                            wf.setnchannels(CHANNELS)
+                            wf.setsampwidth(2)  # 16-bit
+                            wf.setframerate(RATE)
+                            wf.writeframes(b''.join(frames))
+                        end_time = time.time()
+                        print(f"Audio saved to {AIOutputAudio}. Time taken: {end_time - start_time:.2f} seconds")
+                    except Exception as e:
+                        print(f"Error saving audio file: {str(e)}")
+                        conversation_active = False
+                        continue
+
+                    print("Processing audio with AI...")
+                    try:
+                        start_time = time.time()
+                        ai_timeout = 60  # 60 seconds timeout for AI processing
+                        response_file, conversation_ended = aiClient.process_audio(AIOutputAudio)
+                        end_time = time.time()
+                        if end_time - start_time > ai_timeout:
+                            print(f"AI processing timed out after {ai_timeout} seconds")
+                            conversation_active = False
+                            continue
+                        print(f"AI processing complete. Time taken: {end_time - start_time:.2f} seconds")
+                        print(f"Response file: {response_file}, Conversation ended: {conversation_ended}")
+                        
+                        # Update conversation history
+                        conversation_history.append({"role": "user", "content": "Audio input"})
+
+                    except Exception as e:
+                        print(f"Error during AI processing: {str(e)}")
+                        conversation_active = False
+                        continue
+
+                    if response_file:
+                        display.sync_audio_and_gif(response_file, SpeakingGif)
+                        if conversation_ended:
+                            print("AI has determined the conversation has ended.")
+                            conversation_active = False
+                        elif len(conversation_history) >= 2 and not conversation_history[-2]["content"].strip():
+                            silence_count += 1
+                            if silence_count >= max_silence:
+                                print("Maximum silence reached. Ending conversation.")
+                                conversation_active = False
+                    else:
+                        print("No response generated. Resuming wake word detection.")
+                        conversation_active = False
+
+                    if time.time() - conversation_start_time > 300:  # 5 minutes timeout
+                        print("Conversation timeout reached. Ending conversation.")
+                        conversation_active = False
 
                 except Exception as e:
                     print(f"Error in conversation loop: {str(e)}")
@@ -141,7 +197,7 @@ def main():
 
             # Reset conversation history at the end of each conversation
             conversation_history = []
-            display.fade_in_logo(SeamanLogo)   
+            display.queue_image(SeamanLogo, fade_in=True, steps=7)
             print("Conversation ended. Returning to wake word detection.")
 
     except KeyboardInterrupt:

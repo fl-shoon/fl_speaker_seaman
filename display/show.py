@@ -1,4 +1,4 @@
-import sys, os, ctypes
+import sys, os, ctypes, queue
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from transmission.serialModule import SerialModule
@@ -13,6 +13,8 @@ class DisplayModule:
         self.serial = SerialModule(BautRate)
         self.stop_display = threading.Event()
         self.display_thread = None
+        self.display_queue = queue.Queue()
+        self.is_running = False
 
     def fade_in_logo(self, logo_path, steps=7):
         print(f"Starting fade_in_logo with {logo_path}")
@@ -55,21 +57,40 @@ class DisplayModule:
                 print(f"Error playing audio: {str(e)}")
         print("Exiting play_trigger_with_logo method")
 
-    def start_display_thread(self, image_path):
-        self.stop_display.clear()
-        self.display_thread = threading.Thread(target=self.display_image, args=(image_path, self.stop_display))
-        self.display_thread.start()
+    def start_display_thread(self):
+        if self.display_thread is None or not self.display_thread.is_alive():
+            self.is_running = True
+            self.display_thread = threading.Thread(target=self._display_loop)
+            self.display_thread.start()
 
     def stop_display_thread(self, timeout=5):
         if self.display_thread and self.display_thread.is_alive():
             print("Stopping display thread...")
-            self.stop_display.set()
+            self.is_running = False
+            self.display_queue.put(None)  # Signal to stop the thread
             self.display_thread.join(timeout=timeout)
             if self.display_thread.is_alive():
                 print(f"Warning: Display thread did not stop within the {timeout}-second timeout period.")
-                self._force_stop_thread(self.display_thread)
             else:
                 print("Display thread stopped successfully.")
+        self.display_thread = None
+
+    def _display_loop(self):
+        while self.is_running:
+            try:
+                item = self.display_queue.get(timeout=0.1)
+                if item is None:
+                    break  # Exit signal received
+                image_path, fade_in, steps = item
+                self.serial.fade_image(image_path, fade_in=fade_in, steps=steps)
+            except queue.Empty:
+                continue  # No item in queue, continue looping
+            except Exception as e:
+                print(f"Error in display loop: {str(e)}")
+        print("Display thread stopped")
+
+    def queue_image(self, image_path, fade_in=True, steps=1):
+        self.display_queue.put((image_path, fade_in, steps))
 
     def _force_stop_thread(self, thread):
         if not thread.is_alive():
