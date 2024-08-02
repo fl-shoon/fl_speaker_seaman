@@ -37,7 +37,7 @@ class DisplayModule:
         if self.serial.open(USBPort):
             self.player.play(trigger_audio)
             
-            fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path))
+            fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
             fade_thread.start()
 
             print(f"Is playing: {self.player.is_playing()}")
@@ -92,7 +92,7 @@ class DisplayModule:
         if self.serial.open(USBPort):
             self.player.play(audio_file)
             
-            gif_thread = threading.Thread(target=self.update_gif, args=(gif_path))
+            gif_thread = threading.Thread(target=self.update_gif, args=(gif_path,))
             gif_thread.start()
 
             print(f"Is playing: {self.player.is_playing()}")

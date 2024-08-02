@@ -66,7 +66,7 @@ def main():
 
             while conversation_active:
                 stop_display = threading.Event()
-                display_thread = threading.Thread(target=display.display_image, args=(SatoruHappy, stop_display))
+                display_thread = threading.Thread(target=display.display_image, args=(SatoruHappy, stop_display,))
                 display_thread.start()
 
                 play_audio_client = pyaudio.PyAudio()
