@@ -1,6 +1,3 @@
-# SetUp OS & Libraries
-from setup import RaspberryPiSetup
-
 # Serial/Display
 from display.show import DisplayModule
 

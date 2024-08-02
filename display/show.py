@@ -11,7 +11,7 @@ import time, io, threading
 class DisplayModule:
     def __init__(self):
         self.player = AudioPlayerModule()
-        self.display = SerialModule(BautRate)
+        self.serial = SerialModule(BautRate)
 
     def fade_in_logo(self, logo_path, steps=7):
         img = Image.open(logo_path)
@@ -30,11 +30,11 @@ class DisplayModule:
             rgb_img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
-            self.display.send_image_data(img_byte_arr)
+            self.serial.send_image_data(img_byte_arr)
             time.sleep(0.01) 
 
     def play_trigger_with_logo(self, trigger_audio, logo_path):
-        if self.display.open(USBPort):
+        if self.serial.open(USBPort):
             self.player.play(trigger_audio)
             
             fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path))
@@ -53,14 +53,14 @@ class DisplayModule:
                 self.player.audio_clock.tick(10)
 
     def update_gif(self, gif_path, frame_delay=0.1):
-        frames = self.display.prepare_gif(gif_path)
-        all_frames = self.display.precompute_frames(frames)
+        frames = self.serial.prepare_gif(gif_path)
+        all_frames = self.serial.precompute_frames(frames)
         
         print(f"Total pre-computed frames: {len(all_frames)}")
         frame_index = 0
         print(f"Is playing: {self.player.is_playing()}")
         while self.player.is_playing():
-            self.display.send_image_data(all_frames[frame_index])
+            self.serial.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(frame_delay)
 
@@ -76,23 +76,23 @@ class DisplayModule:
             img_data = img_byte_arr.getvalue()
 
         while not stop_event.is_set():
-            self.display.send_image_data(img_data)
+            self.serial.send_image_data(img_data)
             time.sleep(0.1)  
 
     def display_gif(self,gif_path, stop_event=threading.Event()):
-        frames = self.display.prepare_gif(gif_path)
-        all_frames = self.display.precompute_frames(frames)
+        frames = self.serial.prepare_gif(gif_path)
+        all_frames = self.serial.precompute_frames(frames)
         frame_index = 0
         while not stop_event.is_set():
-            self.display.send_image_data(all_frames[frame_index])
+            self.serial.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
     def sync_audio_and_gif(self, audio_file, gif_path):
-        if self.display.open(USBPort):
+        if self.serial.open(USBPort):
             self.player.play(audio_file)
             
-            gif_thread = threading.Thread(target=self.update_gif, args=(self.display, gif_path))
+            gif_thread = threading.Thread(target=self.update_gif, args=(gif_path))
             gif_thread.start()
 
             print(f"Is playing: {self.player.is_playing()}")
@@ -100,7 +100,7 @@ class DisplayModule:
                 self.player.audio_clock.tick(10)
 
             gif_thread.join()
-            self.display.send_white_frames()
+            self.serial.send_white_frames()
         else: 
             print("Failed to display gif")
             self.player.play(audio_file)
