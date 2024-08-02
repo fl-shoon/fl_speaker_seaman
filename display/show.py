@@ -70,11 +70,37 @@ class DisplayModule:
     #     self.display_thread.start()
 
     def display_image(self, image_path):
-        img = Image.open(image_path)
-        img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        self.serial_module.send_image_data(img_byte_arr)
+        try:
+            print(f"Opening image: {image_path}")
+            img = Image.open(image_path)
+            width, height = img.size
+            print(f"Image size: {width}x{height}")
+
+            # Convert image to RGB mode if it's not already
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            if (width, height) != (240, 240):
+                img = img.resize((240, 240))
+                print("Image resized to 240x240")
+
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            img_byte_arr = img_byte_arr.getvalue()
+
+            print("Sending image to display...")
+            self.send_image_data(img_byte_arr)
+            print("Image sent to display")
+
+        except Exception as e:
+            print(f"Error in display_image: {e}")
+
+    # def display_image(self, image_path):
+    #     img = Image.open(image_path)
+    #     img_byte_arr = io.BytesIO()
+    #     img.save(img_byte_arr, format='PNG')
+    #     img_byte_arr = img_byte_arr.getvalue()
+    #     self.serial_module.send_image_data(img_byte_arr)
 
     def start_listening_display(self, image_path):
         self.display_image(image_path)
