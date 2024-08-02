@@ -14,29 +14,43 @@ class DisplayModule:
         self.serial = SerialModule(BautRate)
 
     def fade_in_logo(self, logo_path, steps=7):
-        img = Image.open(logo_path)
-        width, height = img.size
-        
-        for i in range(steps):
-            alpha = int(255 * (i + 1) / steps)
-            faded_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-            faded_img.paste(img, (0, 0))
-            faded_img.putalpha(alpha)
+        print(f"Starting fade_in_logo with {logo_path}")
+        try:
+            img = Image.open(logo_path)
+            width, height = img.size
+            print(f"Image size: {width}x{height}")
+            
+            for i in range(steps):
+                print(f"Processing step {i+1}/{steps}")
+                alpha = int(255 * (i + 1) / steps)
+                faded_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+                faded_img.paste(img, (0, 0))
+                faded_img.putalpha(alpha)
 
-            rgb_img = Image.new("RGB", faded_img.size, (0, 0, 0))
-            rgb_img.paste(faded_img, mask=faded_img.split()[3])
+                rgb_img = Image.new("RGB", faded_img.size, (0, 0, 0))
+                rgb_img.paste(faded_img, mask=faded_img.split()[3])
 
-            img_byte_arr = io.BytesIO()
-            rgb_img.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
+                img_byte_arr = io.BytesIO()
+                rgb_img.save(img_byte_arr, format='PNG')
+                img_byte_arr = img_byte_arr.getvalue()
 
-            self.serial.send_image_data(img_byte_arr)
-            time.sleep(0.01) 
+                success = self.serial.send_image_data(img_byte_arr)
+                if not success:
+                    print(f"Failed to send image data for step {i+1}")
+                
+                time.sleep(0.05)  
+            
+            print("Finished fade_in_logo")
+        except Exception as e:
+            print(f"Error in fade_in_logo: {str(e)}") 
 
     def play_trigger_with_logo(self, trigger_audio, logo_path):
+        print("Entering play_trigger_with_logo method")
         if self.serial.open(USBPort):
+            print("Serial port opened successfully")
             self.player.play(trigger_audio)
             
+            print("Starting fade_thread")
             fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
             fade_thread.start()
 
@@ -44,13 +58,16 @@ class DisplayModule:
             while self.player.is_playing():
                 self.player.audio_clock.tick(10)
 
+            print("Audio playback finished, joining fade_thread")
             fade_thread.join()
+            print("fade_thread joined")
         else: 
             print("Failed to open display port")
             self.player.play(trigger_audio)
             print(f"Is playing: {self.player.is_playing()}")
             while self.player.is_playing():
                 self.player.audio_clock.tick(10)
+        print("Exiting play_trigger_with_logo method")
 
     def update_gif(self, gif_path, frame_delay=0.1):
         frames = self.serial.prepare_gif(gif_path)

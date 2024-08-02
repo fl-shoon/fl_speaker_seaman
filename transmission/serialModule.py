@@ -26,11 +26,30 @@ class SerialModule:
         self.comm.read_all()
 
     def send_image_data(self, img_data):
-        self.send_text()
-        self.comm.read_all()  # Clear any remaining data
-        self.comm.write(img_data)
-        time.sleep(0.02)  # Wait a bit after sending
-        self.comm.read_all()
+        try:
+            print(f"Sending image data of size: {len(img_data)} bytes")
+            self.send_text()
+            
+            remaining_data = self.comm.read_all()
+            if remaining_data:
+                print(f"Cleared remaining data: {remaining_data}")
+            
+            bytes_written = self.comm.write(img_data)
+            print(f"Bytes written: {bytes_written}")
+            
+            # Wait for potential response
+            time.sleep(0.05)  
+            
+            response = self.comm.read_all()
+            if response:
+                print(f"Received response after sending image: {response}")
+            else:
+                print("No response received after sending image")
+            
+            return bytes_written == len(img_data)
+        except Exception as e:
+            print(f"Error in send_image_data: {str(e)}")
+            return False
 
     def send_white_frames(self, flash_delay=0.05):
         white_frame = np.full((240, 240, 3), 255, dtype=np.uint8)
