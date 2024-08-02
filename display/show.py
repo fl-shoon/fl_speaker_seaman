@@ -26,36 +26,46 @@ class DisplayModule:
         print("Entering play_trigger_with_logo method")
         if self.serial.open(USBPort):
             print("Serial port opened successfully")
-            self.player.play(trigger_audio)
-            
-            fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
-            fade_thread.start()
+            try:
+                self.player.play(trigger_audio)
+                
+                fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
+                fade_thread.start()
 
-            print(f"Is playing: {self.player.is_playing()}")
-            while self.player.is_playing():
-                self.player.audio_clock.tick(10)
+                print(f"Is playing: {self.player.is_playing()}")
+                while self.player.is_playing():
+                    self.player.audio_clock.tick(10)
 
-            print("Audio playback finished, waiting for fade_thread")
-            fade_thread.join(timeout=15)  # Increased timeout to 15 seconds
+                print("Audio playback finished, waiting for fade_thread")
+                fade_thread.join(timeout=15)
 
-            if fade_thread.is_alive():
-                print("fade_thread did not complete within the timeout period")
-            else:
-                print("fade_thread completed successfully")
-
+                if fade_thread.is_alive():
+                    print("fade_thread did not complete within the timeout period")
+                else:
+                    print("fade_thread completed successfully")
+            except Exception as e:
+                print(f"Error in play_trigger_with_logo: {str(e)}")
         else: 
             print("Failed to open display port")
-            self.player.play(trigger_audio)
-            while self.player.is_playing():
-                self.player.audio_clock.tick(10)
+            try:
+                self.player.play(trigger_audio)
+                while self.player.is_playing():
+                    self.player.audio_clock.tick(10)
+            except Exception as e:
+                print(f"Error playing audio: {str(e)}")
         print("Exiting play_trigger_with_logo method")
 
     def display_image(self, image_path, stop_event):
+        start_time = time.time()
         while not stop_event.is_set():
             try:
                 self.serial.fade_image(image_path, fade_in=True, steps=1)
-                time.sleep(0.1)
-                if stop_event.is_set():
+                for _ in range(10):  # Check stop_event more frequently
+                    if stop_event.is_set():
+                        break
+                    time.sleep(0.01)
+                if time.time() - start_time > 30:  # 30 seconds timeout
+                    print("Display image timeout reached")
                     break
             except Exception as e:
                 print(f"Error in display_image: {str(e)}")

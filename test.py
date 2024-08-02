@@ -42,6 +42,7 @@ def main():
             recorder.start()
             wake_word_detected = False
 
+            wake_word_start_time = time.time()
             while not wake_word_detected:
                 try:
                     audio_frame = recorder.read()
@@ -52,105 +53,87 @@ def main():
                         wake_word_detected = True
                         detected_keyword = detections.index(max(detections))
                         print(f"Detected keyword: {detected_keyword}")
+                    if time.time() - wake_word_start_time > 60:  # 1 minute timeout
+                        print("Wake word detection timeout. Restarting loop.")
+                        break
                 except OSError as e:
                     print(f"Stream error: {e}. Reopening stream.")
                     recorder.stop()
+                    time.sleep(1)
+                    recorder.start()
 
-            global conversation_history
-            conversation_history = []
-            
+            if not wake_word_detected:
+                continue
+
             conversation_active = True
             silence_count = 0
             max_silence = 2
             conversation_start_time = time.time()
 
             while conversation_active:
-                display.stop_display.clear()
-                display_thread = threading.Thread(target=display.display_image, args=(SatoruHappy, display.stop_display))
-                display_thread.start()
+                try:
+                    display.stop_display.clear()
+                    display_thread = threading.Thread(target=display.display_image, args=(SatoruHappy, display.stop_display))
+                    display_thread.start()
 
-                play_audio_client = pyaudio.PyAudio()
-                stream = play_audio_client.open(format=FORMAT,
-                                    channels=CHANNELS,
-                                    rate=RATE,
-                                    input=True,
-                                    frames_per_buffer=CHUNK)
+                    play_audio_client = pyaudio.PyAudio()
+                    stream = play_audio_client.open(format=FORMAT,
+                                        channels=CHANNELS,
+                                        rate=RATE,
+                                        input=True,
+                                        frames_per_buffer=CHUNK)
 
-                print("* recording")
-                frames = []
+                    print("* recording")
+                    frames = []
+                    recording_start_time = time.time()
 
-                for _ in range(0, int(RATE / vt.frame_size * RECORD_SECONDS)):
+                    while time.time() - recording_start_time < RECORD_SECONDS:
+                        try:
+                            data = stream.read(CHUNK)
+                            frames.append(data)
+                        except OSError as e:
+                            print(f"Stream error during recording: {e}. Reopening stream.")
+                            stream.stop_stream()
+                            stream.close()
+                            play_audio_client.terminate()
+                            play_audio_client = pyaudio.PyAudio()
+                            stream = play_audio_client.open(format=FORMAT,
+                                                channels=CHANNELS,
+                                                rate=RATE,
+                                                input=True,
+                                                frames_per_buffer=CHUNK)
+
+                    print("* done recording")
+
+                    print("Stopping audio stream...")
+                    stream.stop_stream()
+                    stream.close()
+                    play_audio_client.terminate()
+                    print("Audio stream stopped and closed.")
+
+                    print("Stopping display thread...")
+                    display.stop_display.set()
+                    display_thread.join(timeout=5)
+                    if display_thread.is_alive():
+                        print("Warning: Display thread did not stop within the timeout period.")
+                    else:
+                        print("Display thread stopped successfully.")
+
+                    print("Sending white frames...")
                     try:
-                        data = stream.read(vt.frame_size)
-                        frames.append(data)
-                    except OSError as e:
-                        print(f"Stream error during recording: {e}. Reopening stream.")
-                        stream.stop_stream()
-                        stream.close()
-                        break
+                        display.serial.send_white_frames()
+                        print("White frames sent successfully.")
+                    except Exception as e:
+                        print(f"Error sending white frames: {str(e)}")
 
-                print("* done recording")
+                    # ... (rest of the conversation loop remains the same)
 
-                print("Stopping audio stream...")
-                stream.stop_stream()
-                stream.close()
-                play_audio_client.terminate()
-                print("Audio stream stopped and closed.")
-
-                print("Stopping display thread...")
-                display.stop_display.set()
-                display_thread.join(timeout=5)
-                if display_thread.is_alive():
-                    print("Warning: Display thread did not stop within the timeout period.")
-                else:
-                    print("Display thread stopped successfully.")
-
-                print("Sending white frames...")
-                try:
-                    display.serial.send_white_frames()
-                    print("White frames sent successfully.")
-                except Exception as e:
-                    print(f"Error sending white frames: {str(e)}")
-
-                print("Saving recorded audio...")
-                try:
-                    with wave.open(AIOutputAudio, 'wb') as wf:
-                        wf.setnchannels(CHANNELS)
-                        wf.setsampwidth(2)  # 16-bit
-                        wf.setframerate(RATE)
-                        wf.writeframes(b''.join(frames))
-                    print(f"Audio saved to {AIOutputAudio}")
-                except Exception as e:
-                    print(f"Error saving audio file: {str(e)}")
-                    conversation_active = False
-                    continue
-
-                print("Processing audio with AI...")
-                try:
-                    response_file, conversation_ended = aiClient.process_audio(AIOutputAudio)
-                    print(f"AI processing complete. Response file: {response_file}, Conversation ended: {conversation_ended}")
-                except Exception as e:
-                    print(f"Error during AI processing: {str(e)}")
-                    conversation_active = False
-                    continue
-
-                if response_file:
-                    display.sync_audio_and_gif(response_file, SpeakingGif)
-                    if conversation_ended:
-                        print("AI has determined the conversation has ended.")
+                    if time.time() - conversation_start_time > 300:  # 5 minutes timeout
+                        print("Conversation timeout reached. Ending conversation.")
                         conversation_active = False
-                    elif not conversation_history[-2]["content"].strip():  # Check if user's last message was empty
-                        silence_count += 1
-                        if silence_count >= max_silence:
-                            print("Maximum silence reached. Ending conversation.")
-                            conversation_active = False
-                else:
-                    print("No response generated. Resuming wake word detection.")
-                    conversation_active = False
 
-                # New timeout check
-                if time.time() - conversation_start_time > 300:  # 5 minutes timeout
-                    print("Conversation timeout reached. Ending conversation.")
+                except Exception as e:
+                    print(f"Error in conversation loop: {str(e)}")
                     conversation_active = False
 
             display.fade_in_logo(SeamanLogo)   
@@ -158,9 +141,14 @@ def main():
 
     except KeyboardInterrupt:
         print("Stopping...")
-        display.stop_display.set()
-        display.serial.send_white_frames()
+    except Exception as e:
+        print(f"Unexpected error in main loop: {str(e)}")
     finally:
+        try:
+            display.stop_display.set()
+            display.serial.send_white_frames()
+        except Exception as e:
+            print(f"Error during cleanup: {str(e)}")
         recorder.delete()
         display.serial.close()
 

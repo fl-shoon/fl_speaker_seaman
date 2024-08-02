@@ -92,12 +92,26 @@ class SerialModule:
             
             time.sleep(0.05) 
 
-    def send_white_frames(self, flash_delay=0.05):
+    def send_white_frames(self, flash_delay=0.05, max_retries=3):
         white_frame = np.full((240, 240, 3), 255, dtype=np.uint8)
         white_frame_bytes = self.frame_to_bytes(white_frame)
-        # Display white frame
-        self.send_image_data(white_frame_bytes)
-        time.sleep(flash_delay)
+        for attempt in range(max_retries):
+            try:
+                print(f"Sending white frame (attempt {attempt + 1}/{max_retries})")
+                success = self.send_image_data(white_frame_bytes)
+                if success:
+                    print("White frame sent successfully")
+                    time.sleep(flash_delay)
+                    return True
+                else:
+                    print(f"Failed to send white frame (attempt {attempt + 1}/{max_retries})")
+            except Exception as e:
+                print(f"Error sending white frame: {str(e)}")
+            if attempt < max_retries - 1:
+                print("Retrying...")
+                time.sleep(1)
+        print("Failed to send white frames after all retries")
+        return False
 
     def prepare_gif(self, gif_path, target_size=(240, 240)):
         gif = Image.open(gif_path)
