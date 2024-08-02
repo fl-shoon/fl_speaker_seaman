@@ -36,13 +36,13 @@ class DisplayModule:
 
                 success = self.serial.send_image_data(img_byte_arr)
                 if not success:
-                    print(f"Failed to send image data for step {i+1}")
+                    print(f"Failed to send image data for step {i+1}, but continuing...")
                 
-                time.sleep(0.05)  
+                time.sleep(0.05)  # Increased delay between steps
             
             print("Finished fade_in_logo")
         except Exception as e:
-            print(f"Error in fade_in_logo: {str(e)}") 
+            print(f"Error in fade_in_logo: {str(e)}")
 
     def play_trigger_with_logo(self, trigger_audio, logo_path):
         print("Entering play_trigger_with_logo method")

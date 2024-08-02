@@ -34,19 +34,23 @@ class SerialModule:
             if remaining_data:
                 print(f"Cleared remaining data: {remaining_data}")
             
+            print("Starting to write image data...")
             bytes_written = self.comm.write(img_data)
             print(f"Bytes written: {bytes_written}")
             
-            # Wait for potential response
+            print("Waiting for potential response...")
             time.sleep(0.05)  
             
+            print("Reading response...")
             response = self.comm.read_all()
             if response:
                 print(f"Received response after sending image: {response}")
             else:
                 print("No response received after sending image")
             
-            return bytes_written == len(img_data)
+            success = bytes_written == len(img_data)
+            print(f"Send operation {'successful' if success else 'failed'}")
+            return success
         except Exception as e:
             print(f"Error in send_image_data: {str(e)}")
             return False
