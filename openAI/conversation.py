@@ -72,7 +72,18 @@ class OpenAIModule:
                 f.write(chunk)
 
     def reset_conversation(self):
-        self.conversation_history = []
+        self.conversation_history = [
+            {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
+            ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
+            会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
+            ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
+        ]
+
+    def get_last_user_message(self):
+        for message in reversed(self.conversation_history):
+            if message["role"] == "user":
+                return message["content"]
+        return ""
 
     def process_audio(self, audio_file: str, output_file: str) -> tuple[str, bool]:
         # Speech-to-Text
