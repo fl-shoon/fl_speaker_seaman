@@ -27,48 +27,47 @@ class SerialModule:
         time.sleep(0.01)
         self.comm.read_all()
 
-    def send_image_data(self, img_data, timeout=5, retries=3):
-        if not self.isPortOpen or self.comm is None:
+    def send_image_data(self, img_data, timeout=5, chunk_size=1024):
+        if not self.comm:
             print("Serial port is not open")
             return False
 
         print(f"Sending image data of size: {len(img_data)} bytes")
+        self.comm.reset_input_buffer()
+        self.comm.reset_output_buffer()
+
+        start_time = time.time()
+        total_sent = 0
         
-        for attempt in range(retries):
-            try:
-                print(f"Attempt {attempt + 1}/{retries} to send image data")
-                self.send_text()
-                self.comm.read_all()  # Clear any remaining data
+        try:
+            for i in range(0, len(img_data), chunk_size):
+                chunk = img_data[i:i+chunk_size]
+                self.comm.write(chunk)
+                total_sent += len(chunk)
                 
-                start_time = time.time()
-                bytes_written = self.comm.write(img_data)
-                write_time = time.time() - start_time
-                print(f"Bytes written: {bytes_written}, Time taken: {write_time:.2f} seconds")
+                if time.time() - start_time > timeout:
+                    print("Sending image data timed out")
+                    return False
                 
-                self.comm.flush()  # Ensure all data is written
-                
-                # Wait for response with timeout
-                response_start_time = time.time()
-                while time.time() - response_start_time < timeout:
-                    if self.comm.in_waiting:
-                        response = self.comm.read_all()
-                        print(f"Received response after sending image: {response}")
-                        return True
-                    time.sleep(0.1)
-                
-                print(f"No response received within {timeout} seconds")
-                
-            except serial.SerialTimeoutException:
-                print(f"Timeout occurred while writing image data (attempt {attempt + 1}/{retries})")
-            except Exception as e:
-                print(f"Error in send_image_data: {str(e)} (attempt {attempt + 1}/{retries})")
+                # Print progress every 10%
+                if total_sent % (len(img_data) // 10) < chunk_size:
+                    print(f"Sent {total_sent}/{len(img_data)} bytes ({total_sent/len(img_data)*100:.1f}%)")
+
+            self.comm.flush()
+            print(f"Image data sent successfully. Total bytes sent: {total_sent}")
             
-            if attempt < retries - 1:
-                print("Retrying...")
-                time.sleep(1)
-        
-        print("Failed to send image data after all retries")
-        return False
+            # Wait for acknowledgment
+            ack = self.comm.read(1)
+            if ack == b'A':
+                print("Received acknowledgment from device")
+                return True
+            else:
+                print(f"Did not receive proper acknowledgment. Received: {ack}")
+                return False
+
+        except Exception as e:
+            print(f"Error sending image data: {str(e)}")
+            return False
 
     def fade_image(self, image_path, fade_in=True, steps=20):
         img = Image.open(image_path)
@@ -107,37 +106,23 @@ class SerialModule:
                 print(f"Attempt {attempt + 1}/{max_retries} to send white frame")
                 start_time = time.time()
                 
-                # Clear any existing data in the serial buffer
                 self.comm.reset_input_buffer()
                 self.comm.reset_output_buffer()
                 
-                # Send a small test message
-                self.comm.write(b'TEST')
+                # Send a command to prepare the device for white frame
+                self.comm.write(b'WHITE\n')
                 time.sleep(0.1)
                 response = self.comm.read_all()
-                print(f"Test message response: {response}")
+                print(f"White frame preparation response: {response}")
 
                 # Send the actual white frame data
-                bytes_written = self.comm.write(white_frame_bytes)
-                self.comm.flush()
-                print(f"Bytes written: {bytes_written}")
-
-                # Wait for acknowledgment with timeout
-                ack_received = False
-                while time.time() - start_time < timeout:
-                    if self.comm.in_waiting:
-                        ack = self.comm.read_all()
-                        print(f"Received acknowledgment: {ack}")
-                        ack_received = True
-                        break
-                    time.sleep(0.1)
-
-                if ack_received:
-                    print("White frame sent and acknowledged successfully")
+                result = self.send_image_data(white_frame_bytes, timeout)
+                if result:
+                    print("White frame sent successfully")
                     time.sleep(flash_delay)
                     return True
                 else:
-                    print(f"No acknowledgment received within {timeout} seconds")
+                    print("Failed to send white frame")
 
             except Exception as e:
                 print(f"Error in send_white_frames: {str(e)}")
