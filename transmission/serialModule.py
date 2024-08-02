@@ -97,28 +97,55 @@ class SerialModule:
             
             time.sleep(0.05) 
 
-    def send_white_frames(self, flash_delay=0.05, max_retries=3):
+    def send_white_frames(self, flash_delay=0.05, max_retries=3, timeout=5):
         white_frame = np.full((240, 240, 3), 255, dtype=np.uint8)
         white_frame_bytes = self.frame_to_bytes(white_frame)
+        print(f"Prepared white frame, size: {len(white_frame_bytes)} bytes")
+
         for attempt in range(max_retries):
             try:
                 print(f"Attempt {attempt + 1}/{max_retries} to send white frame")
-                print(f"White frame size: {len(white_frame_bytes)} bytes")
                 start_time = time.time()
-                success = self.send_image_data(white_frame_bytes, timeout=5)  # Add a 5-second timeout
-                end_time = time.time()
-                print(f"Time taken to send white frame: {end_time - start_time:.2f} seconds")
-                if success:
-                    print("White frame sent successfully")
+                
+                # Clear any existing data in the serial buffer
+                self.comm.reset_input_buffer()
+                self.comm.reset_output_buffer()
+                
+                # Send a small test message
+                self.comm.write(b'TEST')
+                time.sleep(0.1)
+                response = self.comm.read_all()
+                print(f"Test message response: {response}")
+
+                # Send the actual white frame data
+                bytes_written = self.comm.write(white_frame_bytes)
+                self.comm.flush()
+                print(f"Bytes written: {bytes_written}")
+
+                # Wait for acknowledgment with timeout
+                ack_received = False
+                while time.time() - start_time < timeout:
+                    if self.comm.in_waiting:
+                        ack = self.comm.read_all()
+                        print(f"Received acknowledgment: {ack}")
+                        ack_received = True
+                        break
+                    time.sleep(0.1)
+
+                if ack_received:
+                    print("White frame sent and acknowledged successfully")
                     time.sleep(flash_delay)
                     return True
                 else:
-                    print(f"Failed to send white frame (attempt {attempt + 1}/{max_retries})")
+                    print(f"No acknowledgment received within {timeout} seconds")
+
             except Exception as e:
-                print(f"Error sending white frame: {str(e)}")
+                print(f"Error in send_white_frames: {str(e)}")
+
             if attempt < max_retries - 1:
                 print("Retrying...")
                 time.sleep(1)
+
         print("Failed to send white frames after all retries")
         return False
 

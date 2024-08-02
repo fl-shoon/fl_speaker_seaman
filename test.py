@@ -123,9 +123,9 @@ def main():
 
                     print("Sending white frames...")
                     white_frame_start_time = time.time()
-                    white_frame_timeout = 15  # Increase timeout to 15 seconds
+                    white_frame_timeout = 15  
                     try:
-                        white_frame_success = display.serial.send_white_frames()
+                        white_frame_success = display.serial.send_white_frames(timeout=white_frame_timeout)
                         if white_frame_success:
                             print("White frames sent successfully.")
                         else:
