@@ -27,42 +27,47 @@ class SerialModule:
         time.sleep(0.01)
         self.comm.read_all()
 
-    def send_image_data(self, img_data, timeout=5):
+    def send_image_data(self, img_data, timeout=5, retries=3):
         if not self.isPortOpen or self.comm is None:
             print("Serial port is not open")
             return False
 
         print(f"Sending image data of size: {len(img_data)} bytes")
         
-        try:
-            print("Clearing input buffer...")
-            self.comm.reset_input_buffer()
-            print("Clearing output buffer...")
-            self.comm.reset_output_buffer()
+        for attempt in range(retries):
+            try:
+                print(f"Attempt {attempt + 1}/{retries} to send image data")
+                self.send_text()
+                self.comm.read_all()  # Clear any remaining data
+                
+                start_time = time.time()
+                bytes_written = self.comm.write(img_data)
+                write_time = time.time() - start_time
+                print(f"Bytes written: {bytes_written}, Time taken: {write_time:.2f} seconds")
+                
+                self.comm.flush()  # Ensure all data is written
+                
+                # Wait for response with timeout
+                response_start_time = time.time()
+                while time.time() - response_start_time < timeout:
+                    if self.comm.in_waiting:
+                        response = self.comm.read_all()
+                        print(f"Received response after sending image: {response}")
+                        return True
+                    time.sleep(0.1)
+                
+                print(f"No response received within {timeout} seconds")
+                
+            except serial.SerialTimeoutException:
+                print(f"Timeout occurred while writing image data (attempt {attempt + 1}/{retries})")
+            except Exception as e:
+                print(f"Error in send_image_data: {str(e)} (attempt {attempt + 1}/{retries})")
             
-            print("Writing data...")
-            self.comm.write(img_data)
-            
-            print("Flushing output...")
-            self.comm.flush()
-            
-            print("Waiting for response...")
-            start_time = time.time()
-            while time.time() - start_time < timeout:
-                if self.comm.in_waiting:
-                    response = self.comm.read_all()
-                    print(f"Received response: {response}")
-                    return True
-                time.sleep(0.1)
-            
-            print(f"No response received within {timeout} seconds")
-            return False
-            
-        except serial.SerialTimeoutException:
-            print("Timeout occurred while writing image data")
-        except Exception as e:
-            print(f"Error in send_image_data: {str(e)}")
+            if attempt < retries - 1:
+                print("Retrying...")
+                time.sleep(1)
         
+        print("Failed to send image data after all retries")
         return False
 
     def fade_image(self, image_path, fade_in=True, steps=20):
