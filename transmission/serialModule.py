@@ -35,13 +35,12 @@ class SerialModule:
                 print(f"Cleared remaining data: {remaining_data}")
             
             print("Starting to write image data...")
+            self.comm.write_timeout = 5  # Set a 5-second timeout for writing
             bytes_written = self.comm.write(img_data)
             print(f"Bytes written: {bytes_written}")
             
             print("Waiting for potential response...")
-            time.sleep(0.05)  
-            
-            print("Reading response...")
+            self.comm.timeout = 1  # Set a 1-second timeout for reading
             response = self.comm.read_all()
             if response:
                 print(f"Received response after sending image: {response}")
@@ -51,6 +50,9 @@ class SerialModule:
             success = bytes_written == len(img_data)
             print(f"Send operation {'successful' if success else 'failed'}")
             return success
+        except serial.SerialTimeoutException:
+            print("Timeout occurred while writing image data")
+            return False
         except Exception as e:
             print(f"Error in send_image_data: {str(e)}")
             return False
