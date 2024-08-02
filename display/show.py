@@ -4,8 +4,10 @@ from PIL import Image
 import io
 import pygame
 from pygame import mixer
+# from transmission.serialModule import SerialModule
 
 class DisplayModule:
+    # def __init__(self, serial_module=SerialModule):
     def __init__(self, serial_module):
         self.serial_module = serial_module
 

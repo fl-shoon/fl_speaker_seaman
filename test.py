@@ -3,8 +3,8 @@ import numpy as np
 from datetime import datetime
 
 # Serial/Display
-from display.show import DisplayModule
 from transmission.serialModule import SerialModule
+from display.show import DisplayModule
 
 # AI
 from openAI.conversation import OpenAIModule
@@ -30,14 +30,17 @@ def main():
                 if serial_module.open(USBPort):
                     print("Successfully reopened serial connection.")
                     return True
+                print(f"Attempt {attempt + 1} failed. Retrying in 1 second...")
                 time.sleep(1)
-            print("Failed to reopen serial connection. Exiting.")
+            print("Failed to reopen serial connection after 3 attempts. Exiting.")
             sys.exit(1)
         return True
 
+    print(f"Attempting to open serial port {USBPort} at {BautRate} baud...")
     if not serial_module.open(USBPort):  
-        print("Failed to open serial port. Exiting.")
+        print(f"Failed to open serial port {USBPort}. Please check the connection and port settings.")
         sys.exit(1)
+    print("Serial port opened successfully.")
 
     parser = argparse.ArgumentParser()
     display = DisplayModule(serial_module)

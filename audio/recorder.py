@@ -4,7 +4,7 @@ from etc.define import CHUNK, CHANNELS, RATE, FORMAT, RECORD_SECONDS
 def record_audio(frame_size):
     p = pyaudio.PyAudio()
     
-    stream = p.open(format=getattr(pyaudio, FORMAT),
+    stream = p.open(format=FORMAT,  
                     channels=CHANNELS,
                     rate=RATE,
                     input=True,
