@@ -7,6 +7,7 @@ class SerialModule:
     def __init__(self, baud_rate='230400'):
         self.isPortOpen = False
         self.baud_rate = baud_rate
+        self.comm = None
 
     def open(self, tty):
         try:
@@ -27,6 +28,10 @@ class SerialModule:
         self.comm.read_all()
 
     def send_image_data(self, img_data, timeout=5, retries=3):
+        if not self.isPortOpen or self.comm is None:
+            print("Serial port is not open")
+            return False
+
         print(f"Sending image data of size: {len(img_data)} bytes")
         
         for attempt in range(retries):
@@ -34,29 +39,16 @@ class SerialModule:
                 self.send_text()
                 self.comm.read_all()  # Clear any remaining data
                 
-                send_complete = False
-                def timeout_handler():
-                    nonlocal send_complete
-                    if not send_complete:
-                        raise serial.SerialTimeoutException("Send operation timed out")
-
-                timer = Timer(timeout, timeout_handler)
-                timer.start()
-
-                try:
-                    bytes_written = self.comm.write(img_data)
-                    send_complete = True
-                    print(f"Bytes written: {bytes_written}")
-                    
-                    response = self.comm.read_all()
-                    if response:
-                        print(f"Received response after sending image: {response}")
-                    
-                    success = bytes_written == len(img_data)
-                    print(f"Send operation {'successful' if success else 'failed'}")
-                    return success
-                finally:
-                    timer.cancel()
+                bytes_written = self.comm.write(img_data)
+                print(f"Bytes written: {bytes_written}")
+                
+                response = self.comm.read_all()
+                if response:
+                    print(f"Received response after sending image: {response}")
+                
+                success = bytes_written == len(img_data)
+                print(f"Send operation {'successful' if success else 'failed'}")
+                return success
 
             except serial.SerialTimeoutException:
                 print(f"Timeout occurred while writing image data (attempt {attempt + 1}/{retries})")
@@ -161,7 +153,7 @@ class SerialModule:
                 time.sleep(frame_delay)
 
     def close(self):
-        if self.isPortOpen:
+        if self.isPortOpen and self.comm is not None:
             self.comm.close()
             self.isPortOpen = False
             print("Serial connection closed")

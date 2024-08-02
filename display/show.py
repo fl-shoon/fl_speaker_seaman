@@ -12,6 +12,7 @@ class DisplayModule:
     def __init__(self):
         self.player = AudioPlayerModule()
         self.serial = SerialModule(BautRate)
+        self.stop_display = threading.Event()
 
     def fade_in_logo(self, logo_path, steps=7):
         print(f"Starting fade_in_logo with {logo_path}")
@@ -35,7 +36,7 @@ class DisplayModule:
                 self.player.audio_clock.tick(10)
 
             print("Audio playback finished, waiting for fade_thread")
-            fade_thread.join(timeout=15)  
+            fade_thread.join(timeout=15)  # Increased timeout to 15 seconds
 
             if fade_thread.is_alive():
                 print("fade_thread did not complete within the timeout period")
@@ -49,6 +50,15 @@ class DisplayModule:
                 self.player.audio_clock.tick(10)
         print("Exiting play_trigger_with_logo method")
 
+    def display_image(self, image_path, stop_event):
+        while not stop_event.is_set():
+            try:
+                self.serial.fade_image(image_path, fade_in=True, steps=1)
+                time.sleep(0.1)
+            except Exception as e:
+                print(f"Error in display_image: {str(e)}")
+                break
+
     def update_gif(self, gif_path, frame_delay=0.1):
         frames = self.serial.prepare_gif(gif_path)
         all_frames = self.serial.precompute_frames(frames)
@@ -60,21 +70,6 @@ class DisplayModule:
             self.serial.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(frame_delay)
-
-    def display_image(self, image_path, stop_event):
-        with Image.open(image_path) as img:
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            img = img.resize((240, 240), Image.LANCZOS)
-            
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_data = img_byte_arr.getvalue()
-
-        while not stop_event.is_set():
-            self.serial.send_image_data(img_data)
-            time.sleep(0.1)  
 
     def display_gif(self,gif_path, stop_event=threading.Event()):
         frames = self.serial.prepare_gif(gif_path)

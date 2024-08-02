@@ -67,8 +67,8 @@ def main():
             max_silence = 2
 
             while conversation_active:
-                stop_display = threading.Event()
-                display_thread = threading.Thread(target=display.display_image, args=(SatoruHappy, stop_display,))
+                display.stop_display.clear()
+                display_thread = threading.Thread(target=display.display_image, args=(SatoruHappy, display.stop_display))
                 display_thread.start()
 
                 play_audio_client = pyaudio.PyAudio()
@@ -100,7 +100,7 @@ def main():
                 print("Audio stream stopped and closed.")
 
                 print("Stopping display thread...")
-                stop_display.set()
+                display.stop_display.set()
                 display_thread.join(timeout=5)
                 if display_thread.is_alive():
                     print("Warning: Display thread did not stop within the timeout period.")
@@ -155,6 +155,7 @@ def main():
 
     except KeyboardInterrupt:
         print("Stopping...")
+        display.stop_display.set()
         display.serial.send_white_frames()
     finally:
         recorder.delete()
