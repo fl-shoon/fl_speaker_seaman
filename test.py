@@ -24,7 +24,7 @@ def main():
     serial_module = SerialModule(BautRate)
     
     def ensure_serial_connection():
-        if not serial_module.is_open():
+        if not serial_module.isPortOpen:
             print("Serial connection closed. Attempting to reopen...")
             for attempt in range(3):  # Try to reopen 3 times
                 if serial_module.open(USBPort):
