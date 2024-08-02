@@ -35,6 +35,8 @@ def main():
 
     display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
+    time.sleep(1)
+
     try:
         while True:
             print("Listening for wake word...")

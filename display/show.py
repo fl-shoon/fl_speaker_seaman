@@ -14,14 +14,14 @@ class DisplayModule:
         self.serial = SerialModule(BautRate)
 
     def fade_in_logo(self, logo_path, steps=7):
-        print(f"Starting fade_in_logo with {logo_path}")
+        print(f"fade_in_logo: Starting with {logo_path}")
         try:
             img = Image.open(logo_path)
             width, height = img.size
-            print(f"Image size: {width}x{height}")
+            print(f"fade_in_logo: Image size: {width}x{height}")
             
             for i in range(steps):
-                print(f"Processing step {i+1}/{steps}")
+                print(f"fade_in_logo: Processing step {i+1}/{steps}")
                 alpha = int(255 * (i + 1) / steps)
                 faded_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
                 faded_img.paste(img, (0, 0))
@@ -34,15 +34,17 @@ class DisplayModule:
                 rgb_img.save(img_byte_arr, format='PNG')
                 img_byte_arr = img_byte_arr.getvalue()
 
+                print(f"fade_in_logo: Sending image data for step {i+1}")
                 success = self.serial.send_image_data(img_byte_arr)
                 if not success:
-                    print(f"Failed to send image data for step {i+1}, but continuing...")
+                    print(f"fade_in_logo: Failed to send image data for step {i+1}, but continuing...")
                 
-                time.sleep(0.05)  # Increased delay between steps
+                time.sleep(0.05)
             
-            print("Finished fade_in_logo")
+            print("fade_in_logo: Finished successfully")
         except Exception as e:
-            print(f"Error in fade_in_logo: {str(e)}")
+            print(f"fade_in_logo: Error occurred: {str(e)}")
+            raise
 
     def play_trigger_with_logo(self, trigger_audio, logo_path):
         print("Entering play_trigger_with_logo method")
@@ -59,8 +61,15 @@ class DisplayModule:
                 self.player.audio_clock.tick(10)
 
             print("Audio playback finished, joining fade_thread")
-            fade_thread.join()
-            print("fade_thread joined")
+            try:
+                fade_thread.join(timeout=10)  # Wait for up to 10 seconds
+                if fade_thread.is_alive():
+                    print("fade_thread did not complete within the timeout period")
+                else:
+                    print("fade_thread completed successfully")
+            except Exception as e:
+                print(f"Error while joining fade_thread: {str(e)}")
+
         else: 
             print("Failed to open display port")
             self.player.play(trigger_audio)
