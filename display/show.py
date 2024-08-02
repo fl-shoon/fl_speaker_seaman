@@ -55,9 +55,12 @@ class DisplayModule:
             try:
                 self.serial.fade_image(image_path, fade_in=True, steps=1)
                 time.sleep(0.1)
+                if stop_event.is_set():
+                    break
             except Exception as e:
                 print(f"Error in display_image: {str(e)}")
                 break
+        print("Display thread stopped")
 
     def update_gif(self, gif_path, frame_delay=0.1):
         frames = self.serial.prepare_gif(gif_path)

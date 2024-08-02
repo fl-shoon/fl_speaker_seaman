@@ -30,7 +30,6 @@ def main():
     vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, args.threshold)
     print(f"Set threshold to {args.threshold}")
 
-    # Initialize PvRecorder with the same frame size as Toshiba Voice Trigger
     recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
 
     display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
@@ -57,14 +56,13 @@ def main():
                     print(f"Stream error: {e}. Reopening stream.")
                     recorder.stop()
 
-            # Reset conversation history for new conversation
             global conversation_history
             conversation_history = []
             
-            # Start conversation loop
             conversation_active = True
             silence_count = 0
             max_silence = 2
+            conversation_start_time = time.time()
 
             while conversation_active:
                 display.stop_display.clear()
@@ -150,6 +148,11 @@ def main():
                     print("No response generated. Resuming wake word detection.")
                     conversation_active = False
 
+                # New timeout check
+                if time.time() - conversation_start_time > 300:  # 5 minutes timeout
+                    print("Conversation timeout reached. Ending conversation.")
+                    conversation_active = False
+
             display.fade_in_logo(SeamanLogo)   
             print("Conversation ended. Returning to wake word detection.")
 
@@ -160,6 +163,9 @@ def main():
     finally:
         recorder.delete()
         display.serial.close()
+
+if __name__ == '__main__':
+    main()
 
 if __name__ == '__main__':
     main()
