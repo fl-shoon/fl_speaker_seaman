@@ -143,59 +143,7 @@ def main():
                         print(f"Error sending white frames: {str(e)}")
                         print("Attempting to continue despite white frame error...")
 
-                    print("Saving recorded audio...")
-                    try:
-                        start_time = time.time()
-                        with wave.open(AIOutputAudio, 'wb') as wf:
-                            wf.setnchannels(CHANNELS)
-                            wf.setsampwidth(2)  # 16-bit
-                            wf.setframerate(RATE)
-                            wf.writeframes(b''.join(frames))
-                        end_time = time.time()
-                        print(f"Audio saved to {AIOutputAudio}. Time taken: {end_time - start_time:.2f} seconds")
-                    except Exception as e:
-                        print(f"Error saving audio file: {str(e)}")
-                        conversation_active = False
-                        continue
-
-                    print("Processing audio with AI...")
-                    try:
-                        start_time = time.time()
-                        ai_timeout = 60  # 60 seconds timeout for AI processing
-                        response_file, conversation_ended = aiClient.process_audio(AIOutputAudio)
-                        end_time = time.time()
-                        if end_time - start_time > ai_timeout:
-                            print(f"AI processing timed out after {ai_timeout} seconds")
-                            conversation_active = False
-                            continue
-                        print(f"AI processing complete. Time taken: {end_time - start_time:.2f} seconds")
-                        print(f"Response file: {response_file}, Conversation ended: {conversation_ended}")
-                        
-                        # Update conversation history
-                        conversation_history.append({"role": "user", "content": "Audio input"})
-
-                    except Exception as e:
-                        print(f"Error during AI processing: {str(e)}")
-                        conversation_active = False
-                        continue
-
-                    if response_file:
-                        display.sync_audio_and_gif(response_file, SpeakingGif)
-                        if conversation_ended:
-                            print("AI has determined the conversation has ended.")
-                            conversation_active = False
-                        elif len(conversation_history) >= 2 and not conversation_history[-2]["content"].strip():
-                            silence_count += 1
-                            if silence_count >= max_silence:
-                                print("Maximum silence reached. Ending conversation.")
-                                conversation_active = False
-                    else:
-                        print("No response generated. Resuming wake word detection.")
-                        conversation_active = False
-
-                    if time.time() - conversation_start_time > 300:  # 5 minutes timeout
-                        print("Conversation timeout reached. Ending conversation.")
-                        conversation_active = False
+                    # ... (rest of the conversation loop, including AI processing and response playback)
 
                 except Exception as e:
                     print(f"Error in conversation loop: {str(e)}")

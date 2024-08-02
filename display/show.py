@@ -5,14 +5,14 @@ from transmission.serialModule import SerialModule
 from audio.audioPlayer import AudioPlayerModule
 from etc.define import *
 
-from PIL import Image
-import time, io, threading
+import time, threading
 
 class DisplayModule:
     def __init__(self):
         self.player = AudioPlayerModule()
         self.serial = SerialModule(BautRate)
         self.stop_display = threading.Event()
+        self.display_thread = None
 
     def fade_in_logo(self, logo_path, steps=7):
         print(f"Starting fade_in_logo with {logo_path}")
@@ -55,6 +55,21 @@ class DisplayModule:
                 print(f"Error playing audio: {str(e)}")
         print("Exiting play_trigger_with_logo method")
 
+    def start_display_thread(self, image_path):
+        self.stop_display.clear()
+        self.display_thread = threading.Thread(target=self.display_image, args=(image_path, self.stop_display))
+        self.display_thread.start()
+
+    def stop_display_thread(self, timeout=5):
+        if self.display_thread and self.display_thread.is_alive():
+            print("Stopping display thread...")
+            self.stop_display.set()
+            self.display_thread.join(timeout=timeout)
+            if self.display_thread.is_alive():
+                print(f"Warning: Display thread did not stop within the {timeout}-second timeout period.")
+            else:
+                print("Display thread stopped successfully.")
+                
     def display_image(self, image_path, stop_event):
         start_time = time.time()
         while not stop_event.is_set():
