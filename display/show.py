@@ -1,16 +1,16 @@
 import sys, os, ctypes, queue
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from transmission.serialModule import SerialModule
 from audio.audioPlayer import AudioPlayerModule
 from etc.define import *
 
-import time, threading
+import time, threading, io
+from PIL import Image
 
 class DisplayModule:
-    def __init__(self):
+    def __init__(self, serial_module):
         self.player = AudioPlayerModule()
-        self.serial = SerialModule(BautRate)
+        self.serial = serial_module
         self.stop_display = threading.Event()
         self.display_thread = None
         self.display_queue = queue.Queue()
@@ -57,23 +57,20 @@ class DisplayModule:
                 print(f"Error playing audio: {str(e)}")
         print("Exiting play_trigger_with_logo method")
 
-    def start_display_thread(self):
-        if self.display_thread is None or not self.display_thread.is_alive():
-            self.is_running = True
-            self.display_thread = threading.Thread(target=self._display_loop)
-            self.display_thread.start()
+    def start_display_thread(self, image_path):
+        self.stop_display.clear()
+        self.display_thread = threading.Thread(target=self.display_image, args=(image_path,))
+        self.display_thread.start()
 
     def stop_display_thread(self, timeout=5):
         if self.display_thread and self.display_thread.is_alive():
             print("Stopping display thread...")
-            self.is_running = False
-            self.display_queue.put(None)  # Signal to stop the thread
+            self.stop_display.set()
             self.display_thread.join(timeout=timeout)
             if self.display_thread.is_alive():
                 print(f"Warning: Display thread did not stop within the {timeout}-second timeout period.")
             else:
                 print("Display thread stopped successfully.")
-        self.display_thread = None
 
     def _display_loop(self):
         while self.is_running:
@@ -103,22 +100,53 @@ class DisplayModule:
         elif res != 1:
             ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident, None)
             raise SystemError("PyThreadState_SetAsyncExc failed")
-    def display_image(self, image_path, stop_event):
+    
+    def display_image(self, image_path):
+        print(f"Starting display of image: {image_path}")
         start_time = time.time()
-        while not stop_event.is_set():
-            try:
-                self.serial.fade_image(image_path, fade_in=True, steps=1)
-                for _ in range(10):  # Check stop_event more frequently
-                    if stop_event.is_set():
-                        break
-                    time.sleep(0.01)
-                if time.time() - start_time > 30:  # 30 seconds timeout
-                    print("Display image timeout reached")
-                    break
-            except Exception as e:
-                print(f"Error in display_image: {str(e)}")
-                break
-        print("Display thread stopped")
+        display_timeout = 30  # 30 seconds timeout for entire display operation
+        retry_delay = 0.5  # Delay between retries
+        max_retries = 3
+
+        try:
+            with Image.open(image_path) as img:
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='PNG')
+                img_data = img_byte_arr.getvalue()
+
+            while not self.stop_display.is_set() and time.time() - start_time < display_timeout:
+                for attempt in range(max_retries):
+                    if self.stop_display.is_set():
+                        print("Stop signal received. Exiting display_image.")
+                        return
+
+                    try:
+                        print(f"Sending image data (Attempt {attempt + 1}/{max_retries})")
+                        success = self.serial.send_image_data(img_data, timeout=5)
+                        if success:
+                            print("Image sent successfully")
+                            time.sleep(0.1)  # Short delay before next display attempt
+                            break
+                        else:
+                            print(f"Failed to send image (Attempt {attempt + 1}/{max_retries})")
+                    except Exception as e:
+                        print(f"Error sending image: {str(e)}")
+
+                    if attempt < max_retries - 1:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+
+                if self.stop_display.wait(0.1):  # Check stop_display every 100ms
+                    print("Stop signal received. Exiting display_image.")
+                    return
+
+            if time.time() - start_time >= display_timeout:
+                print("Display operation timed out")
+
+        except Exception as e:
+            print(f"Error in display_image: {str(e)}")
+
+        print("Exiting display_image method")
 
     def update_gif(self, gif_path, frame_delay=0.1):
         frames = self.serial.prepare_gif(gif_path)
@@ -161,3 +189,6 @@ class DisplayModule:
             print(f"Is playing: {self.player.is_playing()}")
             while self.player.is_playing():
                 self.player.audio_clock.tick(10)
+
+    def close(self):
+        self.stop_display_thread()

@@ -1,5 +1,6 @@
 # Serial/Display
 from display.show import DisplayModule
+from transmission.serialModule import SerialModule
 
 # AI
 from openAI.conversation import OpenAIModule
@@ -12,14 +13,20 @@ from pvrecorder import PvRecorder
 from etc.define import *
 
 # others
-import argparse, time, wave, pyaudio, queue
+import argparse, time, wave, pyaudio, queue, sys
 import numpy as np
 from datetime import datetime
 
 def main():
+    serial_module = SerialModule(BautRate)
+    if not serial_module.open(USBPort):  
+        print("Failed to open serial port. Exiting.")
+        sys.exit(1)
+
     parser = argparse.ArgumentParser()
-    display = DisplayModule()
+    display = DisplayModule(serial_module)
     aiClient = OpenAIModule()
+
     parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
     parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
     args = parser.parse_args()
@@ -125,7 +132,7 @@ def main():
                     white_frame_start_time = time.time()
                     white_frame_timeout = 15  
                     try:
-                        white_frame_success = display.serial.send_white_frames(timeout=white_frame_timeout)
+                        white_frame_success = display.serial.send_white_frames()
                         if white_frame_success:
                             print("White frames sent successfully.")
                         else:
@@ -205,13 +212,16 @@ def main():
     except Exception as e:
         print(f"Unexpected error in main loop: {str(e)}")
     finally:
+        print("Cleaning up resources...")
         display.stop_display_thread(timeout=5)
+        display.close()
         try:
-            display.serial.send_white_frames()
+            serial_module.send_white_frames()
         except Exception as e:
-            print(f"Error during cleanup: {str(e)}")
+            print(f"Error sending white frames during cleanup: {str(e)}")
         recorder.delete()
-        display.serial.close()
+        serial_module.close()
+        print("Cleanup completed.")
 
 if __name__ == '__main__':
     main()
