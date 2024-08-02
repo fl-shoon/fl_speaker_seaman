@@ -36,15 +36,20 @@ class SerialModule:
         
         for attempt in range(retries):
             try:
+                print(f"Attempt {attempt + 1}/{retries} to send image data")
                 self.send_text()
                 self.comm.read_all()  # Clear any remaining data
                 
-                self.comm.write(img_data)
+                start_time = time.time()
+                bytes_written = self.comm.write(img_data)
+                write_time = time.time() - start_time
+                print(f"Bytes written: {bytes_written}, Time taken: {write_time:.2f} seconds")
+                
                 self.comm.flush()  # Ensure all data is written
                 
                 # Wait for response with timeout
-                start_time = time.time()
-                while time.time() - start_time < timeout:
+                response_start_time = time.time()
+                while time.time() - response_start_time < timeout:
                     if self.comm.in_waiting:
                         response = self.comm.read_all()
                         print(f"Received response after sending image: {response}")
@@ -97,8 +102,12 @@ class SerialModule:
         white_frame_bytes = self.frame_to_bytes(white_frame)
         for attempt in range(max_retries):
             try:
-                print(f"Sending white frame (attempt {attempt + 1}/{max_retries})")
+                print(f"Attempt {attempt + 1}/{max_retries} to send white frame")
+                print(f"White frame size: {len(white_frame_bytes)} bytes")
+                start_time = time.time()
                 success = self.send_image_data(white_frame_bytes)
+                end_time = time.time()
+                print(f"Time taken to send white frame: {end_time - start_time:.2f} seconds")
                 if success:
                     print("White frame sent successfully")
                     time.sleep(flash_delay)
