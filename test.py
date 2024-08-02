@@ -97,7 +97,7 @@ def main():
 
                 stop_display.set()
                 display_thread.join()
-                display.send_white_frames()
+                display.serial.send_white_frames()
 
                 if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
                     print("Recording was incomplete. Skipping processing.")
@@ -133,10 +133,10 @@ def main():
 
     except KeyboardInterrupt:
         print("Stopping...")
-        display.display.send_white_frames()
+        display.serial.send_white_frames()
     finally:
         recorder.delete()
-        display.display.close()
+        display.serial.close()
 
 if __name__ == '__main__':
     main()
