@@ -41,7 +41,7 @@ def main():
     recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
 
     display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
-    display.start_display_thread()
+    display.start_display_thread(SatoruHappy)
 
     time.sleep(1)
 
