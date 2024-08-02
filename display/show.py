@@ -89,7 +89,7 @@ class DisplayModule:
             img_byte_arr = img_byte_arr.getvalue()
 
             print("Sending image to display...")
-            self.send_image_data(img_byte_arr)
+            self.serial_module.send_image_data(img_byte_arr)
             print("Image sent to display")
 
         except Exception as e:
