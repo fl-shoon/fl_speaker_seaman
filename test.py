@@ -74,15 +74,10 @@ def main():
                 continue
 
             conversation_active = True
-            silence_count = 0
-            max_silence = 2
-            conversation_start_time = time.time()
 
             while conversation_active:
                 try:
-                    display.stop_display.clear()
-                    display_thread = threading.Thread(target=display.display_image, args=(SatoruHappy, display.stop_display))
-                    display_thread.start()
+                    display.start_display_thread(SatoruHappy)
 
                     play_audio_client = pyaudio.PyAudio()
                     stream = play_audio_client.open(format=FORMAT,
@@ -120,12 +115,7 @@ def main():
                     print("Audio stream stopped and closed.")
 
                     print("Stopping display thread...")
-                    display.stop_display.set()
-                    display_thread.join(timeout=5)
-                    if display_thread.is_alive():
-                        print("Warning: Display thread did not stop within the timeout period.")
-                    else:
-                        print("Display thread stopped successfully.")
+                    display.stop_display_thread(timeout=5)
 
                     print("Sending white frames...")
                     white_frame_start_time = time.time()
@@ -159,8 +149,8 @@ def main():
     except Exception as e:
         print(f"Unexpected error in main loop: {str(e)}")
     finally:
+        display.stop_display_thread(timeout=5)
         try:
-            display.stop_display.set()
             display.serial.send_white_frames()
         except Exception as e:
             print(f"Error during cleanup: {str(e)}")

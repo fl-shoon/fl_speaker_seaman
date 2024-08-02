@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, ctypes
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from transmission.serialModule import SerialModule
@@ -67,9 +67,21 @@ class DisplayModule:
             self.display_thread.join(timeout=timeout)
             if self.display_thread.is_alive():
                 print(f"Warning: Display thread did not stop within the {timeout}-second timeout period.")
+                self._force_stop_thread(self.display_thread)
             else:
                 print("Display thread stopped successfully.")
-                
+
+    def _force_stop_thread(self, thread):
+        if not thread.is_alive():
+            return
+
+        exc = ctypes.py_object(SystemExit)
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(thread.ident), exc)
+        if res == 0:
+            raise ValueError("Invalid thread ID")
+        elif res != 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident, None)
+            raise SystemError("PyThreadState_SetAsyncExc failed")
     def display_image(self, image_path, stop_event):
         start_time = time.time()
         while not stop_event.is_set():
