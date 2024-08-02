@@ -78,6 +78,8 @@ def main():
                         wake_word_detected = True
                         detected_keyword = detections.index(max(detections))
                         print(f"Detected keyword: {detected_keyword}")
+                        play_audio(ResponseAudio)
+                        time.sleep(0.5)
                 except OSError as e:
                     print(f"Stream error: {e}. Reopening stream.")
                     recorder.stop()
@@ -93,12 +95,12 @@ def main():
 
             while conversation_active:
                 ensure_serial_connection()
-                display.start_listening_animation()
+                display.start_listening_display(SatoruHappy)
 
                 frames = record_audio(vt.frame_size)
 
                 ensure_serial_connection()
-                display.stop_animation()
+                display.stop_listening_display()
 
                 if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
                     print("Recording was incomplete. Skipping processing.")

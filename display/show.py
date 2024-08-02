@@ -63,11 +63,24 @@ class DisplayModule:
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
-    def start_listening_animation(self):
-        from etc.define import SpeakingGif
-        self.stop_event = threading.Event()
-        self.display_thread = threading.Thread(target=self.display_gif, args=(SpeakingGif, self.stop_event))
-        self.display_thread.start()
+    # def start_listening_animation(self):
+    #     from etc.define import SpeakingGif
+    #     self.stop_event = threading.Event()
+    #     self.display_thread = threading.Thread(target=self.display_gif, args=(SpeakingGif, self.stop_event))
+    #     self.display_thread.start()
+
+    def display_image(self, image_path):
+        img = Image.open(image_path)
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+        self.serial_module.send_image_data(img_byte_arr)
+
+    def start_listening_display(self, image_path):
+        self.display_image(image_path)
+
+    def stop_listening_display(self):
+        self.serial_module.send_white_frames()
 
     def stop_animation(self):
         if hasattr(self, 'stop_event'):

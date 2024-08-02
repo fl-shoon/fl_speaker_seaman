@@ -58,7 +58,8 @@ USBPort = '/dev/ttyACM0'
 
 # File Locations
 # =========================
-# conversation
+# conversation 
+ResponseAudio = os.path.join(AUDIO_DIR, "response_audio.wav")
 TriggerAudio = os.path.join(AUDIO_DIR, "trigger.wav")
 AIOutputAudio = TEMP_AUDIO_FILE
 
