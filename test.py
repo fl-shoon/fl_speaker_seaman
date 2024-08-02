@@ -73,10 +73,10 @@ def main():
 
                 play_audio_client = pyaudio.PyAudio()
                 stream = play_audio_client.open(format=FORMAT,
-                                channels=CHANNELS,
-                                rate=RATE,
-                                input=True,
-                                frames_per_buffer=CHUNK)
+                                    channels=CHANNELS,
+                                    rate=RATE,
+                                    input=True,
+                                    frames_per_buffer=CHUNK)
 
                 print("* recording")
                 frames = []
@@ -93,28 +93,48 @@ def main():
 
                 print("* done recording")
 
+                print("Stopping audio stream...")
                 stream.stop_stream()
                 stream.close()
                 play_audio_client.terminate()
+                print("Audio stream stopped and closed.")
 
+                print("Stopping display thread...")
                 stop_display.set()
-                display_thread.join()
-                display.serial.send_white_frames()
+                display_thread.join(timeout=5)
+                if display_thread.is_alive():
+                    print("Warning: Display thread did not stop within the timeout period.")
+                else:
+                    print("Display thread stopped successfully.")
 
-                if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
-                    print("Recording was incomplete. Skipping processing.")
+                print("Sending white frames...")
+                try:
+                    display.serial.send_white_frames()
+                    print("White frames sent successfully.")
+                except Exception as e:
+                    print(f"Error sending white frames: {str(e)}")
+
+                print("Saving recorded audio...")
+                try:
+                    with wave.open(AIOutputAudio, 'wb') as wf:
+                        wf.setnchannels(CHANNELS)
+                        wf.setsampwidth(2)  # 16-bit
+                        wf.setframerate(RATE)
+                        wf.writeframes(b''.join(frames))
+                    print(f"Audio saved to {AIOutputAudio}")
+                except Exception as e:
+                    print(f"Error saving audio file: {str(e)}")
                     conversation_active = False
                     continue
 
-                time.sleep(0.1)
-
-                with wave.open(AIOutputAudio, 'wb') as wf:
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(2)  # 16-bit
-                    wf.setframerate(RATE)
-                    wf.writeframes(b''.join(frames))
-
-                response_file, conversation_ended = aiClient.process_audio(AIOutputAudio)
+                print("Processing audio with AI...")
+                try:
+                    response_file, conversation_ended = aiClient.process_audio(AIOutputAudio)
+                    print(f"AI processing complete. Response file: {response_file}, Conversation ended: {conversation_ended}")
+                except Exception as e:
+                    print(f"Error during AI processing: {str(e)}")
+                    conversation_active = False
+                    continue
 
                 if response_file:
                     display.sync_audio_and_gif(response_file, SpeakingGif)
