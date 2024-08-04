@@ -13,8 +13,11 @@ run_setup() {
 # Function to clean up before exiting
 cleanup() {
     echo "Cleaning up..."
-    kill -TERM "$PYTHON_PID"
-    wait "$PYTHON_PID"
+    if [ ! -z "$PYTHON_PID" ]; then
+        echo "Sending termination signal to Python script..."
+        kill -TERM "$PYTHON_PID"
+        wait "$PYTHON_PID"
+    fi
     deactivate
     exit 0
 }
