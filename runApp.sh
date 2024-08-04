@@ -1,5 +1,23 @@
 #!/bin/bash
 
+# Redirect output to a log file
+exec > >(tee -a "/tmp/seaman_ai_speaker.log") 2>&1
+
+echo "Starting runApp.sh at $(date)"
+echo "Current user: $(whoami)"
+echo "Current directory: $(pwd)"
+echo "Environment variables:"
+env
+
+# Start PulseAudio if it's not running
+if ! pulseaudio --check; then
+    echo "Starting PulseAudio..."
+    pulseaudio --start --exit-idle-time=-1 &
+    sleep 2
+else
+    echo "PulseAudio is already running."
+fi
+
 # Function to run setup
 run_setup() {
     echo "Running setup..."
