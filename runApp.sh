@@ -67,7 +67,7 @@ export OPENAI_API_KEY='key'
 # Function to run the main program
 run_main_program() {
     echo "Starting AI Speaker System..."
-    python3 test.py &
+    python3 app.py &
     PYTHON_PID=$!
     wait "$PYTHON_PID"
     exit_code=$?

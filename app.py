@@ -74,18 +74,23 @@ class KaiwaService:
             await self.loop.run_in_executor(self.executor, self.serial_module.close)
 
     async def ensure_serial_connection(self):
-        if not self.serial_module.isPortOpen:
-            logger.info("Serial connection closed. Attempting to reopen...")
-            for attempt in range(3):  # Try to reopen 3 times
-                if await self.loop.run_in_executor(self.executor, self.serial_module.open, USBPort):
-                    logger.info("Successfully reopened serial connection.")
-                    return True
-                logger.info(f"Attempt {attempt + 1} failed. Retrying in 1 second...")
-                await asyncio.sleep(1)
-            logger.error("Failed to reopen serial connection after 3 attempts. Exiting.")
-            await self.clean()
-            sys.exit(1)
-        return True
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            if self.serial_module.isPortOpen:
+                return True
+            
+            logger.info(f"Attempting to open serial port {USBPort} (Attempt {attempt + 1}/{max_attempts})...")
+            if await self.loop.run_in_executor(self.executor, self.serial_module.open, USBPort):
+                logger.info("Successfully opened serial connection.")
+                return True
+            
+            if attempt < max_attempts - 1:
+                wait_time = 2 ** attempt  # Exponential backoff
+                logger.info(f"Failed to open serial port. Retrying in {wait_time} seconds...")
+                await asyncio.sleep(wait_time)
+        
+        logger.error(f"Failed to open serial port {USBPort} after {max_attempts} attempts.")
+        return False
 
     async def listen_for_wake_word(self):
         while not should_exit.is_set():
@@ -144,9 +149,9 @@ class KaiwaService:
     async def run(self):
         try:
             logger.info(f"Attempting to open serial port {USBPort} at {BautRate} baud...")
-            if not await self.loop.run_in_executor(self.executor, self.serial_module.open, USBPort):  
-                logger.info(f"Failed to open serial port {USBPort}. Please check the connection and port settings.")
-                sys.exit(1)
+            if not await self.ensure_serial_connection():
+                logger.error("Unable to establish serial connection. Exiting.")
+                return
             logger.info("Serial port opened successfully.")
 
             await self.ensure_serial_connection()
