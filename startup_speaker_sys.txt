@@ -5,6 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+Environment="OPENAI_API_KEY='key'"
 ExecStart=/home/poi/seaman/fl_speaker_seaman/runApp.sh
 WorkingDirectory=/home/poi/seaman/fl_speaker_seaman
 StandardOutput=journal

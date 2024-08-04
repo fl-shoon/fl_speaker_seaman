@@ -51,8 +51,9 @@ class SerialModule:
                 response_start_time = time.time()
                 while time.time() - response_start_time < timeout:
                     if self.comm.in_waiting:
-                        response = self.comm.read_all()
-                        print(f"Received response after sending image: {response}")
+                        self.comm.read_all()
+                        # response = self.comm.read_all()
+                        # print(f"Received response after sending image: {response}")
                         return True
                     time.sleep(0.1)
                 
