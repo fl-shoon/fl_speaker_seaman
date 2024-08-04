@@ -1,0 +1,11 @@
+[Unit]
+Description=Play startup audio
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/poi/seaman/test/sound/example.py
+User=poi
+
+[Install]
+WantedBy=multi-user.target

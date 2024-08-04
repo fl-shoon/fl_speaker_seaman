@@ -99,12 +99,12 @@ class AudioPlayerModule:
         return self.current_track
 
 # Usage example
-if __name__ == "__main__":
-    player = AudioPlayerModule()
-    player.play("path/to/your/audio/file.mp3")
-    print(f"Current volume: {player.get_volume()}")
-    player.set_volume(0.5)
-    print(f"Is playing: {player.is_playing()}")
-    player.pause()
-    player.unpause()
-    player.stop()
+# if __name__ == "__main__":
+#     player = AudioPlayerModule()
+#     player.play("path/to/your/audio/file.mp3")
+#     print(f"Current volume: {player.get_volume()}")
+#     player.set_volume(0.5)
+#     print(f"Is playing: {player.is_playing()}")
+#     player.pause()
+#     player.unpause()
+#     player.stop()
