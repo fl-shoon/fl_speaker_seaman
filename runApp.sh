@@ -13,6 +13,11 @@ run_setup() {
 # Function to clean up before exiting
 cleanup() {
     echo "Cleaning up..."
+    if [ ! -z "$PYTHON_PID" ]; then
+        echo "Sending termination signal to Python script..."
+        kill -TERM "$PYTHON_PID"
+        wait "$PYTHON_PID"
+    fi
     deactivate
     exit 0
 }
@@ -37,38 +42,29 @@ source .venv/bin/activate
 
 # Export environment variables
 export OPENAI_API_KEY='key'
-# Add more environment variables as needed, for example:
-# export ANOTHER_API_KEY='another_key'
+# Add more environment variables:
+# export PICCO_ACCESS_KEY='another_key'
 # export CONFIG_PATH='/path/to/config'
 
 # Function to run the main program
 run_main_program() {
     echo "Starting AI Speaker System..."
-    python3 test.py
+    python3 test.py &
+    PYTHON_PID=$!
+    wait "$PYTHON_PID"
     exit_code=$?
 
     if [ $exit_code -eq 1 ]; then
         echo "Error occurred. Checking if it's due to a missing module..."
         if grep -q "ModuleNotFoundError" error.log; then
-            echo "Module not found. Would you like to run setup again? (y/n)"
-            read choice
-            case "$choice" in 
-                y|Y ) 
-                    run_setup
-                    run_main_program
-                    ;;
-                * ) 
-                    echo "Exiting due to module not found error."
-                    exit 1
-                    ;;
-            esac
-        elif [ $exit_code -ne 130 ]; then
-            echo "AI Speaker System exited with code $exit_code. Restarting in 5 seconds..."
-            sleep 5
+            echo "Module not found. Running setup again..."
+            run_setup
             run_main_program
+        else
+            echo "AI Speaker System exited with code $exit_code."
         fi
-    elif [ $exit_code -eq 130 ]; then
-        echo "AI Speaker System was interrupted by Ctrl+C. Shutting down..."
+    elif [ $exit_code -eq 130 ] || [ $exit_code -eq 143 ]; then
+        echo "AI Speaker System was interrupted. Shutting down..."
     fi
 }
 

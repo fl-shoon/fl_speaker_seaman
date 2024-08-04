@@ -1,0 +1,21 @@
+[Unit]
+Description=AI Speaker System
+After=multi-user.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/poi/seaman/fl_speaker_seaman/runApp.sh
+WorkingDirectory=/home/poi/seaman/fl_speaker_seaman
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=5
+User=poi
+Group=audio
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+TimeoutStopSec=30
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

@@ -1,13 +1,9 @@
-import argparse, time, wave, pyaudio, sys
-import numpy as np
-from datetime import datetime
+# AI
+from openAI.conversation import OpenAIModule
 
 # Serial/Display
 from transmission.serialModule import SerialModule
 from display.show import DisplayModule
-
-# AI
-from openAI.conversation import OpenAIModule
 
 # Voice Trigger & Recording 
 from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
@@ -19,6 +15,18 @@ from audio.recorder import record_audio
 
 # Variables
 from etc.define import *
+
+# others
+import argparse, time, wave, sys, signal
+import numpy as np
+from datetime import datetime
+
+def signal_handler(signum, frame):
+    print(f"Received signal {signum}. Initiating graceful shutdown...")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 def main():
     serial_module = SerialModule(BautRate)
@@ -135,7 +143,8 @@ def main():
             ensure_serial_connection()
             display.fade_in_logo(SeamanLogo)   
             print("Conversation ended. Returning to wake word detection.")
-
+        
+            time.sleep(1)
     except KeyboardInterrupt:
         print("Stopping...")
         display.send_white_frames()
