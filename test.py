@@ -17,13 +17,15 @@ from audio.recorder import record_audio
 from etc.define import *
 
 # others
-import argparse, time, wave, sys, signal
+import argparse, time, wave, sys, signal, threading
 import numpy as np
 from datetime import datetime
 
+should_exit = threading.Event()
+
 def signal_handler(signum, frame):
     print(f"Received signal {signum}. Initiating graceful shutdown...")
-    sys.exit(0)
+    should_exit.set()
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
@@ -71,7 +73,7 @@ def main():
     display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
     try:
-        while True:
+        while not should_exit.is_set():
             print("Listening for wake word...")
             recorder.start()
             wake_word_detected = False
@@ -144,7 +146,9 @@ def main():
             display.fade_in_logo(SeamanLogo)   
             print("Conversation ended. Returning to wake word detection.")
         
+            should_exit.wait(timeout=1)
             time.sleep(1)
+        print("Graceful shutdown initiated.")
     except KeyboardInterrupt:
         print("Stopping...")
         display.send_white_frames()
