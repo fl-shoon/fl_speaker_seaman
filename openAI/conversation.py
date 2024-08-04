@@ -1,9 +1,14 @@
-import os
+import os, sys
 from typing import List, Dict
 from openai import OpenAI
 
 class OpenAIModule:
     def __init__(self):
+        try:
+            os.environ['OPENAI_API_KEY']
+        except KeyError:
+            print("ERROR: OPENAI_API_KEY environment variable is not set.")
+            sys.exit(1)
         self.client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
         self.conversation_history: List[Dict[str, str]] = []
 
