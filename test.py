@@ -89,6 +89,7 @@ def main():
             recorder = PvRecorder(device_index=device_index, frame_length=vt.frame_size)
         else:
             logger.error("Error: Could not find the specified input device")
+            recorder = PvRecorder(device_index=3, frame_length=vt.frame_size)
 
         ensure_serial_connection()
         display.play_trigger_with_logo(TriggerAudio, SeamanLogo)

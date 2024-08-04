@@ -19,7 +19,7 @@ def record_audio(frame_size, device_name_pattern="USB PnP Sound Device"):
 
     if device_index is None:
         logger.error(f"Error: Could not find input device matching '{device_name_pattern}'")
-        return None
+        device_index = 3
     
     stream = p.open(format=FORMAT,  
                     channels=CHANNELS,
