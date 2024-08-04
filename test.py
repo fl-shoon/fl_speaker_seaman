@@ -149,10 +149,17 @@ def main():
             should_exit.wait(timeout=1)
             time.sleep(1)
         print("Graceful shutdown initiated.")
+        clean()
     except KeyboardInterrupt:
         print("Stopping...")
         display.send_white_frames()
     finally:
+        recorder.delete()
+        serial_module.close()
+
+    def clean():
+        print("Stopping...")
+        display.send_white_frames()
         recorder.delete()
         serial_module.close()
 
