@@ -11,7 +11,7 @@ from pvrecorder import PvRecorder
 
 # Audio
 from audio.player import play_audio, sync_audio_and_gif
-from audio.recorder import record_audio, get_input_device_index
+from audio.recorder import record_audio
 
 # Variables
 from etc.define import *
@@ -84,12 +84,7 @@ def main():
         vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, args.threshold)
         logger.info(f"Set threshold to {args.threshold}")
 
-        device_index = get_input_device_index("USB PnP Sound Device")
-        if device_index is not None:
-            recorder = PvRecorder(device_index=device_index, frame_length=vt.frame_size)
-        else:
-            logger.error("Error: Could not find the specified input device")
-            recorder = PvRecorder(device_index=3, frame_length=vt.frame_size)
+        recorder = PvRecorder(frame_length=vt.frame_size)
 
         ensure_serial_connection()
         display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
