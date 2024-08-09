@@ -7,13 +7,14 @@ from etc.define import *
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-def is_silent(data_chunk, threshold=300):  # Lowered threshold
+def is_silent(data_chunk, threshold=100):  # Lowered threshold even further
     """Check if the audio chunk is silent."""
-    max_amplitude = np.max(np.abs(np.frombuffer(data_chunk, dtype=np.int16)))
+    amplified_chunk = np.frombuffer(data_chunk, dtype=np.int16) * 5  # Amplify the signal
+    max_amplitude = np.max(np.abs(amplified_chunk))
     logger.debug(f"Max amplitude: {max_amplitude}")
     return max_amplitude < threshold
 
-def record_audio(frame_size, silence_threshold=300, silence_duration=2, max_duration=30, min_duration=0.5):
+def record_audio(frame_size, silence_threshold=100, silence_duration=1.5, max_duration=30, min_duration=0.5):
     p = pyaudio.PyAudio()
 
     stream = p.open(format=FORMAT,
