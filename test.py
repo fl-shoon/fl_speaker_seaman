@@ -126,7 +126,7 @@ def main():
                 ensure_serial_connection()
                 display.start_listening_display(SatoruHappy)
 
-                frames = record_audio(vt.frame_size, silence_threshold=500, silence_duration=3, max_duration=30)
+                frames = record_audio(vt.frame_size)
                 
                 ensure_serial_connection()
                 display.stop_listening_display()

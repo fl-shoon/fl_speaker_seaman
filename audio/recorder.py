@@ -4,14 +4,16 @@ import time
 import logging
 from etc.define import *
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-def is_silent(data_chunk, threshold=500):
+def is_silent(data_chunk, threshold=300):  # Lowered threshold
     """Check if the audio chunk is silent."""
-    return np.max(np.abs(np.frombuffer(data_chunk, dtype=np.int16))) < threshold
+    max_amplitude = np.max(np.abs(np.frombuffer(data_chunk, dtype=np.int16)))
+    logger.debug(f"Max amplitude: {max_amplitude}")
+    return max_amplitude < threshold
 
-def record_audio(frame_size, silence_threshold=500, silence_duration=2, max_duration=30, min_duration=0.5):
+def record_audio(frame_size, silence_threshold=300, silence_duration=2, max_duration=30, min_duration=0.5):
     p = pyaudio.PyAudio()
 
     stream = p.open(format=FORMAT,
@@ -39,6 +41,7 @@ def record_audio(frame_size, silence_threshold=500, silence_duration=2, max_dura
         elif has_speech:
             silent_time += current_time - last_audio_time
             last_audio_time = current_time
+            logger.debug(f"Silent for {silent_time:.2f} seconds")
 
         frames.append(chunk)
 
@@ -61,6 +64,7 @@ def record_audio(frame_size, silence_threshold=500, silence_duration=2, max_dura
         logger.warning("No speech detected or recording too short")
         return []
 
+    logger.info(f"Recorded {len(frames)} frames")
     return frames
 # import pyaudio, logging
 # from etc.define import *
