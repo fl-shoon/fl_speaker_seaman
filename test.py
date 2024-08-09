@@ -126,15 +126,19 @@ def main():
                 ensure_serial_connection()
                 display.start_listening_display(SatoruHappy)
 
-                frames = record_audio(vt.frame_size)
+                frames = record_audio(vt.frame_size, silence_threshold=500, silence_duration=3)
 
                 ensure_serial_connection()
                 display.stop_listening_display()
 
-                if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
-                    logger.info("Recording was incomplete. Skipping processing.")
+                if not frames:
+                    logger.info("No speech detected. Ending conversation.")
                     conversation_active = False
                     continue
+                # if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
+                #     logger.info("Recording was incomplete. Skipping processing.")
+                #     conversation_active = False
+                #     continue
 
                 time.sleep(0.1)
 
