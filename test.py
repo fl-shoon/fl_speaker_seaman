@@ -126,7 +126,7 @@ def main():
                 ensure_serial_connection()
                 display.start_listening_display(SatoruHappy)
 
-                frames = record_audio(vt.frame_size, silence_threshold=500, silence_duration=3)
+                frames = record_audio(vt.frame_size, silence_threshold=500, silence_duration=3, max_duration=30)
                 
                 ensure_serial_connection()
                 display.stop_listening_display()
@@ -153,22 +153,25 @@ def main():
                     wf.setframerate(RATE)
                     wf.writeframes(b''.join(frames))
 
-                response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
+                try:
+                    response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
 
-                if response_file:
-                    ensure_serial_connection()
-                    sync_audio_and_gif(display, response_file, SpeakingGif)
-                    if conversation_ended:
-                        logger.info("AI has determined the conversation has ended.")
-                        conversation_active = False
-                    # elif not ai_client.get_last_user_message().strip():
-                    #     silence_count += 1
-                    #     if silence_count >= max_silence:
-                    #         logger.info("Maximum silence reached. Ending conversation.")
-                    #         conversation_active = False
-                else:
-                    logger.info("No response generated. Resuming wake word detection.")
-                    conversation_active = False
+                    if response_file:
+                        ensure_serial_connection()
+                        sync_audio_and_gif(display, response_file, SpeakingGif)
+                        if conversation_ended:
+                            logger.info("AI has determined the conversation has ended.")
+                            conversation_active = False
+                        # elif not ai_client.get_last_user_message().strip():
+                        #     silence_count += 1
+                        #     if silence_count >= max_silence:
+                        #         logger.info("Maximum silence reached. Ending conversation.")
+                        #         conversation_active = False
+                    else:
+                        logger.info("No response generated. Resuming wake word detection.")
+                        # conversation_active = False
+                except Exception as e:
+                    logger.info(f"an error occurred while processing audio: {e}")
 
             ensure_serial_connection()
             display.fade_in_logo(SeamanLogo)   

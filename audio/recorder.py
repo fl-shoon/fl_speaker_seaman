@@ -1,16 +1,13 @@
 import pyaudio
-import logging
 import numpy as np
+import time
 from etc.define import *
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def is_silent(data_chunk, threshold=500):
     """Check if the audio chunk is silent."""
     return np.max(np.abs(np.frombuffer(data_chunk, dtype=np.int16))) < threshold
 
-def record_audio(frame_size, silence_threshold=500, silence_duration=3, max_duration=30):
+def record_audio(frame_size, silence_threshold=500, silence_duration=2, max_duration=30):
     p = pyaudio.PyAudio()
 
     stream = p.open(format=FORMAT,
@@ -21,25 +18,32 @@ def record_audio(frame_size, silence_threshold=500, silence_duration=3, max_dura
 
     print("* recording")
     frames = []
-    silent_chunks = 0
-    silence_limit = int(silence_duration * RATE / frame_size)
-    max_chunks = int(max_duration * RATE / frame_size)
+    silent_time = 0
+    start_time = time.time()
     has_speech = False
+    last_audio_time = start_time
 
-    for _ in range(max_chunks):
-        try:
-            data = stream.read(frame_size)
-            frames.append(data)
+    while True:
+        current_time = time.time()
+        chunk = stream.read(frame_size)
+        
+        if not is_silent(chunk, silence_threshold):
+            has_speech = True
+            last_audio_time = current_time
+            silent_time = 0
+        elif has_speech:
+            silent_time += current_time - last_audio_time
+            last_audio_time = current_time
 
-            if is_silent(data, silence_threshold):
-                silent_chunks += 1
-                if has_speech and silent_chunks >= silence_limit:
-                    break
-            else:
-                has_speech = True
-                silent_chunks = 0
-        except IOError as e:
-            logger.error(f"Stream error during recording: {e}. Continuing...")
+        frames.append(chunk)
+
+        if has_speech and silent_time >= silence_duration:
+            print("Detected end of speech")
+            break
+        
+        if current_time - start_time >= max_duration:
+            print("Reached maximum duration")
+            break
 
     print("* done recording")
 
