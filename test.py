@@ -120,44 +120,31 @@ def main():
             
             conversation_active = True
             silence_count = 0
-            max_silence = 2
+            max_silence = 3
 
             while conversation_active and not should_exit.is_set():
                 ensure_serial_connection()
                 display.start_listening_display(SatoruHappy)
 
-                silence_start_time = None
-                max_silence_duration = 10
-                recording_chunks = []
-                while len(recording_chunks) < int(RATE / vt.frame_size * 60):
-                    frames = record_audio(vt.frame_size, silence_threshold=500, silence_duration=3)
-
-                    if frames:
-                        recording_chunks.extend(frames)
-                        silence_start_time = None 
-                    else:
-                        if silence_start_time is None:
-                            silence_start_time = time.time()
-                        elif time.time() - silence_start_time > max_silence_duration:
-                            logger.info(f"Maximum silence duration of {max_silence_duration} seconds reached. Ending recording.")
-                            break
-                    time.sleep(0.1)
-
+                frames = record_audio(vt.frame_size, silence_threshold=500, silence_duration=3)
+                
                 ensure_serial_connection()
                 display.stop_listening_display()
 
-                if not recording_chunks:
-                    logger.info("No speech detected. Ending conversation.")
-                    conversation_active = False
-                    continue
+                if not frames:
+                    logger.info("No speech detected in this attempt.")
+                    silence_count += 1
+                    if silence_count >= max_silence:
+                        logger.info(f"No speech detected for {max_silence} consecutive attempts. Ending conversation.")
+                        conversation_active = False
+                        continue
+                else:
+                    silence_count = 0
                 # if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
                 #     logger.info("Recording was incomplete. Skipping processing.")
                 #     conversation_active = False
                 #     continue
 
-                # convert recording_chunks to the format expected by stt
-                frames = b''.join(recording_chunks)
-                
                 time.sleep(0.1)
 
                 with wave.open(AIOutputAudio, 'wb') as wf:
