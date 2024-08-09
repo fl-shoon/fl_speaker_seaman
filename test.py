@@ -161,11 +161,11 @@ def main():
                     if conversation_ended:
                         logger.info("AI has determined the conversation has ended.")
                         conversation_active = False
-                    elif not ai_client.get_last_user_message().strip():
-                        silence_count += 1
-                        if silence_count >= max_silence:
-                            logger.info("Maximum silence reached. Ending conversation.")
-                            conversation_active = False
+                    # elif not ai_client.get_last_user_message().strip():
+                    #     silence_count += 1
+                    #     if silence_count >= max_silence:
+                    #         logger.info("Maximum silence reached. Ending conversation.")
+                    #         conversation_active = False
                 else:
                     logger.info("No response generated. Resuming wake word detection.")
                     conversation_active = False
