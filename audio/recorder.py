@@ -1,13 +1,17 @@
 import pyaudio
 import numpy as np
 import time
+import logging
 from etc.define import *
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def is_silent(data_chunk, threshold=500):
     """Check if the audio chunk is silent."""
     return np.max(np.abs(np.frombuffer(data_chunk, dtype=np.int16))) < threshold
 
-def record_audio(frame_size, silence_threshold=500, silence_duration=2, max_duration=30):
+def record_audio(frame_size, silence_threshold=500, silence_duration=2, max_duration=30, min_duration=0.5):
     p = pyaudio.PyAudio()
 
     stream = p.open(format=FORMAT,
@@ -16,7 +20,7 @@ def record_audio(frame_size, silence_threshold=500, silence_duration=2, max_dura
                     input=True,
                     frames_per_buffer=frame_size)
 
-    print("* recording")
+    logger.info("* recording started")
     frames = []
     silent_time = 0
     start_time = time.time()
@@ -31,27 +35,33 @@ def record_audio(frame_size, silence_threshold=500, silence_duration=2, max_dura
             has_speech = True
             last_audio_time = current_time
             silent_time = 0
+            logger.debug("Speech detected")
         elif has_speech:
             silent_time += current_time - last_audio_time
             last_audio_time = current_time
 
         frames.append(chunk)
 
-        if has_speech and silent_time >= silence_duration:
-            print("Detected end of speech")
+        elapsed_time = current_time - start_time
+        if has_speech and silent_time >= silence_duration and elapsed_time >= min_duration:
+            logger.info(f"Detected end of speech. Total duration: {elapsed_time:.2f} seconds")
             break
         
-        if current_time - start_time >= max_duration:
-            print("Reached maximum duration")
+        if elapsed_time >= max_duration:
+            logger.info(f"Reached maximum duration of {max_duration} seconds")
             break
 
-    print("* done recording")
+    logger.info("* recording finished")
 
     stream.stop_stream()
     stream.close()
     p.terminate()
 
-    return frames if has_speech else []
+    if not has_speech or (time.time() - start_time) < min_duration:
+        logger.warning("No speech detected or recording too short")
+        return []
+
+    return frames
 # import pyaudio, logging
 # from etc.define import *
 
