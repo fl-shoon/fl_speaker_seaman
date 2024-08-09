@@ -126,12 +126,27 @@ def main():
                 ensure_serial_connection()
                 display.start_listening_display(SatoruHappy)
 
-                frames = record_audio(vt.frame_size, silence_threshold=500, silence_duration=3)
+                silence_start_time = None
+                max_silence_duration = 10
+                recording_chunks = []
+                while len(recording_chunks) < int(RATE / vt.frame_size * 60):
+                    frames = record_audio(vt.frame_size, silence_threshold=500, silence_duration=3)
+
+                    if frames:
+                        recording_chunks.extend(frames)
+                        silence_start_time = None 
+                    else:
+                        if silence_start_time is None:
+                            silence_start_time = time.time()
+                        elif time.time() - silence_start_time > max_silence_duration:
+                            logger.info(f"Maximum silence duration of {max_silence_duration} seconds reached. Ending recording.")
+                            break
+                    time.sleep(0.1)
 
                 ensure_serial_connection()
                 display.stop_listening_display()
 
-                if not frames:
+                if not recording_chunks:
                     logger.info("No speech detected. Ending conversation.")
                     conversation_active = False
                     continue
@@ -140,6 +155,9 @@ def main():
                 #     conversation_active = False
                 #     continue
 
+                # convert recording_chunks to the format expected by stt
+                frames = b''.join(recording_chunks)
+                
                 time.sleep(0.1)
 
                 with wave.open(AIOutputAudio, 'wb') as wf:
