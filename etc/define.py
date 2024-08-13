@@ -1,5 +1,8 @@
 import os, pyaudio
-from etc.findPort import find_port
+import serial.tools.list_ports, logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Get the current directory
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -53,10 +56,6 @@ CHANNELS = 1
 RATE = 44100
 RECORD_SECONDS = 8
 
-# Serial/Display Settings
-BautRate = '230400'
-USBPort = find_port()
-
 # File Locations
 # =========================
 # conversation 
@@ -74,3 +73,18 @@ PicoLangModel = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_language_model_ja.pv"
 PicoWakeWordHello = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_wake_word_konnichiwa.ppn") 
 ToshibaVoiceDictionary = os.path.join(VOICE_TRIGGER_DIR,"toshiba_voice_dict_jaJP.vtdic")
 ToshibaVoiceLibrary = os.path.join(VOICE_TRIGGER_DIR,"libVT_ARML64h.so")
+
+# Serial/Display Settings
+BautRate = '230400'
+
+# finding lcd display's device name
+def extract_device():
+    result = '/dev/ttyACM0'
+    ports = [tuple(p) for p in list(serial.tools.list_ports.comports())]
+    logger.info(ports)
+    for device, description, _ in ports:
+        if description == 'RP2040 LCD 1.28 - Board CDC' or 'RP2040' in description or 'LCD' in description:
+            result =  device
+    return result 
+
+USBPort = extract_device()
