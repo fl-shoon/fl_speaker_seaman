@@ -11,7 +11,7 @@ from pvrecorder import PvRecorder
 
 # Audio
 from audio.player import play_audio, sync_audio_and_gif
-from audio.recorder import record_audio
+from audio.saver import record_audio
 
 # Variables
 from etc.define import *
@@ -120,21 +120,30 @@ def main():
             
             conversation_active = True
             silence_count = 0
-            max_silence = 2
+            max_silence = 3
 
             while conversation_active and not should_exit.is_set():
                 ensure_serial_connection()
                 display.start_listening_display(SatoruHappy)
 
                 frames = record_audio(vt.frame_size)
-
+                
                 ensure_serial_connection()
                 display.stop_listening_display()
 
-                if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
-                    logger.info("Recording was incomplete. Skipping processing.")
-                    conversation_active = False
-                    continue
+                if not frames:
+                    logger.info("No speech detected in this attempt.")
+                    silence_count += 1
+                    if silence_count >= max_silence:
+                        logger.info(f"No speech detected for {max_silence} consecutive attempts. Ending conversation.")
+                        conversation_active = False
+                        continue
+                else:
+                    silence_count = 0
+                # if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
+                #     logger.info("Recording was incomplete. Skipping processing.")
+                #     conversation_active = False
+                #     continue
 
                 time.sleep(0.1)
 
@@ -144,22 +153,29 @@ def main():
                     wf.setframerate(RATE)
                     wf.writeframes(b''.join(frames))
 
-                response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
+                if os.path.exists(AIOutputAudio) and os.path.getsize(AIOutputAudio) > 0:
+                    logger.info("Audio file created successfully.")
+                    try:
+                        response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
 
-                if response_file:
-                    ensure_serial_connection()
-                    sync_audio_and_gif(display, response_file, SpeakingGif)
-                    if conversation_ended:
-                        logger.info("AI has determined the conversation has ended.")
-                        conversation_active = False
-                    elif not ai_client.get_last_user_message().strip():
-                        silence_count += 1
-                        if silence_count >= max_silence:
-                            logger.info("Maximum silence reached. Ending conversation.")
-                            conversation_active = False
-                else:
-                    logger.info("No response generated. Resuming wake word detection.")
-                    conversation_active = False
+                        if response_file:
+                            ensure_serial_connection()
+                            sync_audio_and_gif(display, response_file, SpeakingGif)
+                            if conversation_ended:
+                                logger.info("AI has determined the conversation has ended.")
+                                conversation_active = False
+                            # elif not ai_client.get_last_user_message().strip():
+                            #     silence_count += 1
+                            #     if silence_count >= max_silence:
+                            #         logger.info("Maximum silence reached. Ending conversation.")
+                            #         conversation_active = False
+                        else:
+                            logger.info("No response generated. Resuming wake word detection.")
+                            # conversation_active = False
+                    except Exception as e:
+                        logger.info(f"an error occurred while processing audio: {e}")
+                else: 
+                    logger.error(f"Failed to create audio file or file is empty: {AIOutputAudio}")
 
             ensure_serial_connection()
             display.fade_in_logo(SeamanLogo)   
