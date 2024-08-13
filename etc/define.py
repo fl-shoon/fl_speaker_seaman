@@ -1,4 +1,5 @@
 import os, pyaudio
+from etc.findPort import find_port
 
 # Get the current directory
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -54,7 +55,7 @@ RECORD_SECONDS = 8
 
 # Serial/Display Settings
 BautRate = '230400'
-USBPort = '/dev/ttyACM0'
+USBPort = find_port()
 
 # File Locations
 # =========================
