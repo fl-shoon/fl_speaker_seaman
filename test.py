@@ -170,6 +170,9 @@ def main():
 
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
+        error_message = "申し訳ありませんが、システムエラーが発生しました。システムを再起動します。"
+        ai_client.text_to_speech(error_message, AIOutputAudio)
+        sync_audio_and_gif(display, AIOutputAudio, SpeakingGif)
     finally:
         logger.info("Graceful shutdown initiated.")
         clean(recorder, serial_module, display)
