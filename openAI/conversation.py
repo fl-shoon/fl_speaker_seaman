@@ -1,6 +1,8 @@
-import os, sys
+import os, logging, time
 from typing import List, Dict
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class OpenAIModule:
     def __init__(self):
@@ -24,30 +26,49 @@ class OpenAIModule:
         return response.data[0].embedding
 
     def chat(self, new_message: str) -> str:
-        if not self.conversation_history:
-            self.conversation_history = [
-                {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
-                ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
-                会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
-                ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
-            ]
+        max_retries = 3
+        retry_delay = 5
 
-        self.conversation_history.append({"role": "user", "content": new_message})
+        for attempt in range(max_retries):
+            try:
+                if not self.conversation_history:
+                    self.conversation_history = [
+                        {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
+                        ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
+                        会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
+                        ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
+                    ]
 
-        response = self.client.chat.completions.create(
-            model="gpt-4",
-            messages=self.conversation_history,
-            temperature=0.75,
-            max_tokens=500
-        )
-        ai_message = response.choices[0].message.content
-        self.conversation_history.append({"role": "assistant", "content": ai_message})
+                self.conversation_history.append({"role": "user", "content": new_message})
 
-        # Limit conversation history to last 10 messages to prevent token limit issues
-        if len(self.conversation_history) > 11:  # 11 to keep the system message
-            self.conversation_history = self.conversation_history[:1] + self.conversation_history[-10:]
+                response = self.client.chat.completions.create(
+                    model="gpt-4",
+                    messages=self.conversation_history,
+                    temperature=0.75,
+                    max_tokens=500
+                )
+                ai_message = response.choices[0].message.content
+                self.conversation_history.append({"role": "assistant", "content": ai_message})
 
-        return ai_message
+                # Limit conversation history to last 10 messages to prevent token limit issues
+                if len(self.conversation_history) > 11:  # 11 to keep the system message
+                    self.conversation_history = self.conversation_history[:1] + self.conversation_history[-10:]
+
+                return ai_message
+            except OpenAIError as e:
+                if e.code == 'insufficient_quota':
+                    logging.error("OpenAI API quota exceeded. Please check your plan and billing details.")
+                    return "申し訳ありません。現在システムに問題が発生しています。後でもう一度お試しください。"
+                elif e.code == 'rate_limit_exceeded':
+                    if attempt < max_retries - 1:
+                        logging.warning(f"Rate limit exceeded. Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        logging.error("Max retries reached. Unable to complete the request.")
+                        return "申し訳ありません。しばらくしてからもう一度お試しください。"
+                else:
+                    logging.error(f"OpenAI API error: {e}")
+                    return "申し訳ありません。エラーが発生しました。"
 
     def transcribe_audio(self, audio_file_path: str) -> str:
         with open(audio_file_path, "rb") as audio_file:
