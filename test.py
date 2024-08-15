@@ -20,6 +20,7 @@ from etc.define import *
 import argparse, time, wave, sys, signal, threading
 import numpy as np, logging
 from datetime import datetime
+from openai import OpenAIError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -144,21 +145,28 @@ def main():
                     wf.setframerate(RATE)
                     wf.writeframes(b''.join(frames))
 
-                response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
+                
+                try:
+                    response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
 
-                if response_file:
-                    ensure_serial_connection()
-                    sync_audio_and_gif(display, response_file, SpeakingGif)
-                    if conversation_ended:
-                        logger.info("AI has determined the conversation has ended.")
-                        conversation_active = False
-                    elif not ai_client.get_last_user_message().strip():
-                        silence_count += 1
-                        if silence_count >= max_silence:
-                            logger.info("Maximum silence reached. Ending conversation.")
+                    if response_file:
+                        ensure_serial_connection()
+                        sync_audio_and_gif(display, response_file, SpeakingGif)
+                        if conversation_ended:
+                            logger.info("AI has determined the conversation has ended.")
                             conversation_active = False
-                else:
-                    logger.info("No response generated. Resuming wake word detection.")
+                        elif not ai_client.get_last_user_message().strip():
+                            silence_count += 1
+                            if silence_count >= max_silence:
+                                logger.info("Maximum silence reached. Ending conversation.")
+                                conversation_active = False
+                    else:
+                        logger.info("No response generated. Resuming wake word detection.")
+                        conversation_active = False
+                except OpenAIError as e:
+                    error_message = ai_client.handle_openai_error(e)
+                    ai_client.fallback_text_to_speech(error_message, AIOutputAudio)
+                    sync_audio_and_gif(display, AIOutputAudio, SpeakingGif)
                     conversation_active = False
 
             ensure_serial_connection()

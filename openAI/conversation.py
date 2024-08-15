@@ -1,4 +1,4 @@
-import os, logging, time
+import os, logging, time, pygame
 from typing import List, Dict
 from openai import OpenAI, OpenAIError
 logging.basicConfig(level=logging.INFO)
@@ -80,16 +80,20 @@ class OpenAIModule:
         return transcript
 
     def text_to_speech(self, text: str, output_file: str):
-        response = self.client.audio.speech.create(
-            model="tts-1-hd",
-            voice="nova",
-            input=text,
-            response_format="wav",
-        )
+        try:
+            response = self.client.audio.speech.create(
+                model="tts-1-hd",
+                voice="nova",
+                input=text,
+                response_format="wav",
+            )
 
-        with open(output_file, "wb") as f:
-            for chunk in response.iter_bytes(chunk_size=4096):
-                f.write(chunk)
+            with open(output_file, "wb") as f:
+                for chunk in response.iter_bytes(chunk_size=4096):
+                    f.write(chunk)
+        except OpenAIError as e:
+            logging.error(f"Failed to generate speech: {e}")
+            self.fallback_text_to_speech(text, output_file)
 
     def reset_conversation(self):
         self.conversation_history = [
@@ -123,6 +127,7 @@ class OpenAIModule:
     #     print(f'Audio content written to file "{output_file}"')
 
     #     return output_file, conversation_ended
+    
     def process_audio(self, audio_file: str, output_file: str) -> tuple[str, bool]:
         try:
             # Speech-to-Text
@@ -147,6 +152,18 @@ class OpenAIModule:
             error_message = self.handle_openai_error(e)
             self.text_to_speech(error_message, output_file)
             return output_file, True  # End conversation after error
+
+    def fallback_text_to_speech(self, text: str, output_file: str):
+        # This is a very basic fallback using pygame. You might want to use a more sophisticated TTS library.
+        pygame.init()
+        pygame.mixer.init()
+        pygame.font.init()
+        font = pygame.font.Font(None, 32)
+        speech = pygame.Surface((1, 1))
+        speech.fill((255, 255, 255))
+        text_surface = font.render(text, True, (0, 0, 0))
+        speech.blit(text_surface, (0, 0))
+        pygame.mixer.Sound(speech).save(output_file)
 
     def handle_openai_error(self, e: OpenAIError) -> str:
         if e.code == 'insufficient_quota':
