@@ -59,8 +59,9 @@ RECORD_SECONDS = 8
 # File Locations
 # =========================
 # conversation 
-ResponseAudio = os.path.join(AUDIO_DIR, "response_audio.wav")
+ResponseAudio = os.path.join(AUDIO_DIR, "response_audio.wav") 
 TriggerAudio = os.path.join(AUDIO_DIR, "startUp.wav")
+ErrorAudio = os.path.join(AUDIO_DIR, "errorSpeech.wav")
 AIOutputAudio = TEMP_AUDIO_FILE
 
 # display
