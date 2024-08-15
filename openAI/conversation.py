@@ -2,6 +2,8 @@ import os, logging, time, wave
 import numpy as np
 from typing import List, Dict
 from openai import OpenAI, OpenAIError
+from etc.define import ErrorAudio
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -152,7 +154,7 @@ class OpenAIModule:
         except OpenAIError as e:
             error_message = self.handle_openai_error(e)
             self.text_to_speech(error_message, output_file)
-            return output_file, True  # End conversation after error
+            return ErrorAudio, True  # End conversation after error
 
     def fallback_text_to_speech(self, text: str, output_file: str):
         # Generate a simple beep sound
