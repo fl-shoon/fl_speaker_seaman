@@ -1,4 +1,5 @@
-import os, logging, time, pygame
+import os, logging, time, wave
+import numpy as np
 from typing import List, Dict
 from openai import OpenAI, OpenAIError
 logging.basicConfig(level=logging.INFO)
@@ -154,16 +155,24 @@ class OpenAIModule:
             return output_file, True  # End conversation after error
 
     def fallback_text_to_speech(self, text: str, output_file: str):
-        # This is a very basic fallback using pygame. You might want to use a more sophisticated TTS library.
-        pygame.init()
-        pygame.mixer.init()
-        pygame.font.init()
-        font = pygame.font.Font(None, 32)
-        speech = pygame.Surface((1, 1))
-        speech.fill((255, 255, 255))
-        text_surface = font.render(text, True, (0, 0, 0))
-        speech.blit(text_surface, (0, 0))
-        pygame.mixer.Sound(speech).save(output_file)
+        # Generate a simple beep sound
+        duration = 1  # seconds
+        frequency = 440  # Hz (A4 note)
+        sample_rate = 44100  # standard sample rate
+
+        t = np.linspace(0, duration, int(sample_rate * duration), False)
+        audio = np.sin(2 * np.pi * frequency * t)
+        audio = (audio * 32767).astype(np.int16)
+
+        # Write the audio data to a WAV file
+        with wave.open(output_file, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(audio.tobytes())
+
+        logger.warning(f"Fallback TTS used. Original message: {text}")
+        logger.info(f"Fallback audio saved to {output_file}")
 
     def handle_openai_error(self, e: OpenAIError) -> str:
         if e.code == 'insufficient_quota':
