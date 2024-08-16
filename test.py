@@ -18,7 +18,7 @@ from etc.define import *
 
 # others
 import argparse, time, wave, sys, signal, threading, atexit
-import numpy as np, logging, termios, select, tty
+import numpy as np, logging, termios, select, tty, sys
 from datetime import datetime
 from openai import OpenAIError
 
