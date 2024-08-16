@@ -90,7 +90,8 @@ def main():
         logger.info(f"Attempting to open serial port {USBPort} at {BautRate} baud...")
         if not serial_module.open(USBPort):  
             logger.error(f"Failed to open serial port {USBPort}. Please check the connection and port settings.")
-            sys.exit(1)
+            return
+
         logger.info("Serial port opened successfully.")
 
         parser = argparse.ArgumentParser()
@@ -112,8 +113,9 @@ def main():
         recorder = PvRecorder(frame_length=vt.frame_size)
 
         if not ensure_serial_connection():
-            raise Exception("Failed to ensure serial connection.")
-        
+            logger.error("Failed to ensure serial connection. Exiting.")
+            return
+
         logger.info("Playing trigger with logo...")
         display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
@@ -236,4 +238,9 @@ def main():
         logger.info("Exiting program")
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Initiating shutdown...")
+    finally:
+        logger.info("Program execution completed.")
