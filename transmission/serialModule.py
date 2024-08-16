@@ -4,9 +4,10 @@ import numpy as np
 from threading import Timer
 
 class SerialModule:
-    def __init__(self, baud_rate='230400'):
+    def __init__(self, baud_rate='230400', timeout = 1):
         self.isPortOpen = False
         self.baud_rate = baud_rate
+        self.timeout = timeout
         self.comm = None
 
     def open(self, tty):
@@ -19,6 +20,11 @@ class SerialModule:
             print(f"Failed to open port: {e}")
         return self.isPortOpen
 
+    def reconnect(self):
+        if self.comm:
+            self.comm.close()
+        return self.open(self.comm.port)
+    
     def send(self, data):
         self.comm.write(data)
 
@@ -27,46 +33,41 @@ class SerialModule:
         time.sleep(0.01)
         self.comm.read_all()
 
-    def send_image_data(self, img_data, timeout=5, retries=3):
+    def send_image_data(self, img_data, max_retries=5, chunk_size=1024):
         if not self.isPortOpen or self.comm is None:
             print("Serial port is not open")
             return False
 
         print(f"Sending image data of size: {len(img_data)} bytes")
         
-        for attempt in range(retries):
+        for attempt in range(max_retries):
             try:
-                print(f"Attempt {attempt + 1}/{retries} to send image data")
-                self.send_text()
-                self.comm.read_all()  # Clear any remaining data
-                
-                start_time = time.time()
-                bytes_written = self.comm.write(img_data)
-                write_time = time.time() - start_time
-                print(f"Bytes written: {bytes_written}, Time taken: {write_time:.2f} seconds")
-                
-                self.comm.flush()  # Ensure all data is written
-                
-                # Wait for response with timeout
-                response_start_time = time.time()
-                while time.time() - response_start_time < timeout:
-                    if self.comm.in_waiting:
-                        self.comm.read_all()
-                        # response = self.comm.read_all()
-                        # print(f"Received response after sending image: {response}")
-                        return True
-                    time.sleep(0.1)
-                
-                print(f"No response received within {timeout} seconds")
-                
-            except serial.SerialTimeoutException:
-                print(f"Timeout occurred while writing image data (attempt {attempt + 1}/{retries})")
+                self.comm.reset_input_buffer()
+                self.comm.reset_output_buffer()
+
+                # Send data in chunks
+                for i in range(0, len(img_data), chunk_size):
+                    chunk = img_data[i:i+chunk_size]
+                    self.comm.write(chunk)
+                    self.comm.flush()
+                    time.sleep(0.01)  # Small delay between chunks
+
+                print(f"Image data sent successfully on attempt {attempt + 1}")
+                return True
+
+            except serial.SerialException as e:
+                print(f"Serial exception: {e}. Attempting to reconnect...")
+                if not self.reconnect():
+                    print("Reconnection failed")
+                    return False
+
             except Exception as e:
-                print(f"Error in send_image_data: {str(e)} (attempt {attempt + 1}/{retries})")
+                print(f"Error in send_image_data: {str(e)} (attempt {attempt + 1}/{max_retries})")
             
-            if attempt < retries - 1:
-                print("Retrying...")
-                time.sleep(1)
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff
+                print(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
         
         print("Failed to send image data after all retries")
         return False
