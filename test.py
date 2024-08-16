@@ -18,7 +18,7 @@ from etc.define import *
 
 # others
 import argparse, time, wave, sys, signal, threading, atexit
-import numpy as np, logging
+import numpy as np, logging, termios, select, tty
 from datetime import datetime
 from openai import OpenAIError
 
@@ -38,6 +38,19 @@ def signal_handler(signum, frame):
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
+
+def is_data():
+    return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
+
+def get_key():
+    old_settings = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setcbreak(sys.stdin.fileno())
+        if is_data():
+            return sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+    return None
 
 def clean():
     print("Starting cleanup process...")
@@ -128,6 +141,12 @@ def main():
         global_display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not should_exit.is_set():
+            if is_data():
+                key = get_key()
+                if key == 'q':
+                    logger.info("Quit command received. Initiating shutdown...")
+                    break
+
             logger.info("Listening for wake word...")
             global_recorder.start()
             wake_word_detected = False
