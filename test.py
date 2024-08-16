@@ -18,7 +18,7 @@ from etc.define import *
 
 # others
 import argparse, time, wave, sys, signal, threading, atexit
-import numpy as np, logging, termios, select, tty, sys
+import numpy as np, logging, termios, select, tty, sys, threading
 from datetime import datetime
 from openai import OpenAIError
 
@@ -39,18 +39,41 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
-def is_data():
-    return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
+def is_terminal():
+    return sys.stdin.isatty()
+
+def is_data_available():
+    if is_terminal():
+        return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
+    else:
+        return False  # Non-blocking check not possible in non-terminal environment
 
 def get_key():
-    old_settings = termios.tcgetattr(sys.stdin)
-    try:
-        tty.setcbreak(sys.stdin.fileno())
-        if is_data():
-            return sys.stdin.read(1)
-    finally:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+    if is_terminal():
+        old_settings = termios.tcgetattr(sys.stdin)
+        try:
+            tty.setcbreak(sys.stdin.fileno())
+            if is_data_available():
+                return sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
     return None
+
+def input_thread_function(should_exit):
+    while not should_exit.is_set():
+        if is_terminal():
+            key = get_key()
+            if key == 'q':
+                logger.info("Quit command received. Initiating shutdown...")
+                should_exit.set()
+                break
+        else:
+            user_input = input("Press 'q' and Enter to quit: ")
+            if user_input.lower() == 'q':
+                logger.info("Quit command received. Initiating shutdown...")
+                should_exit.set()
+                break
+        time.sleep(0.1)
 
 def clean():
     print("Starting cleanup process...")
@@ -89,6 +112,10 @@ atexit.register(clean)
 def main():
     global global_recorder, global_serial_module, global_display
     
+    input_thread = threading.Thread(target=input_thread_function, args=(should_exit,))
+    input_thread.daemon = True
+    input_thread.start()
+
     def ensure_serial_connection():
         if not global_serial_module.isPortOpen:
             logger.info("Serial connection closed. Attempting to reopen...")
@@ -141,12 +168,6 @@ def main():
         global_display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not should_exit.is_set():
-            if is_data():
-                key = get_key()
-                if key == 'q':
-                    logger.info("Quit command received. Initiating shutdown...")
-                    break
-
             logger.info("Listening for wake word...")
             global_recorder.start()
             wake_word_detected = False
@@ -255,6 +276,8 @@ def main():
 
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+    finally:
+        input_thread.join(timeout=1)
 
 if __name__ == '__main__':
     try:
@@ -263,5 +286,4 @@ if __name__ == '__main__':
         logger.info("KeyboardInterrupt received. Initiating shutdown...")
     finally:
         logger.info("Program execution completed.")
-        # Force the atexit functions to run
         atexit._run_exitfuncs()
