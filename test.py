@@ -17,15 +17,20 @@ from audio.recorder import record_audio
 from etc.define import *
 
 # others
-import argparse, time, wave, sys, signal, threading
+import argparse, time, wave, sys, signal, threading, atexit
 import numpy as np, logging
 from datetime import datetime
 from openai import OpenAIError
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 should_exit = threading.Event()
+
+# Global variables to hold resources that need cleanup
+global_recorder = None
+global_serial_module = None
+global_display = None
 
 def signal_handler(signum, frame):
     logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
@@ -34,45 +39,48 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
-def clean(recorder, serial_module, display):
+def clean():
     logger.info("Starting cleanup process...")
-    if recorder:
+    global global_recorder, global_serial_module, global_display
+    
+    if global_recorder:
         logger.info("Stopping and deleting recorder...")
         try:
-            recorder.stop()
-            recorder.delete()
+            global_recorder.stop()
+            global_recorder.delete()
             logger.info("Recorder stopped and deleted successfully.")
         except Exception as e:
             logger.error(f"Error while stopping recorder: {e}")
     
-    if display:
+    if global_display:
         logger.info("Sending white frames...")
         try:
-            display.send_white_frames()
+            global_display.send_white_frames()
             logger.info("White frames sent successfully.")
         except Exception as e:
             logger.error(f"Error while sending white frames: {e}")
     
-    if serial_module:
+    if global_serial_module:
         logger.info("Closing serial connection...")
         try:
-            serial_module.close()
+            global_serial_module.close()
             logger.info("Serial connection closed successfully.")
         except Exception as e:
             logger.error(f"Error while closing serial connection: {e}")
     
     logger.info("Cleanup process completed.")
 
+# Register the cleanup function to be called on exit
+atexit.register(clean)
+
 def main():
-    serial_module = None
-    display = None
-    recorder = None
+    global global_recorder, global_serial_module, global_display
     
     def ensure_serial_connection():
-        if not serial_module.isPortOpen:
+        if not global_serial_module.isPortOpen:
             logger.info("Serial connection closed. Attempting to reopen...")
             for attempt in range(3):  # Try to reopen 3 times
-                if serial_module.open(USBPort):
+                if global_serial_module.open(USBPort):
                     logger.info("Successfully reopened serial connection.")
                     return True
                 logger.info(f"Attempt {attempt + 1} failed. Retrying in 1 second...")
@@ -83,12 +91,12 @@ def main():
 
     try:
         logger.info("Initializing SerialModule...")
-        serial_module = SerialModule(BautRate)
+        global_serial_module = SerialModule(BautRate)
         logger.info("Initializing DisplayModule...")
-        display = DisplayModule(serial_module)
+        global_display = DisplayModule(global_serial_module)
 
         logger.info(f"Attempting to open serial port {USBPort} at {BautRate} baud...")
-        if not serial_module.open(USBPort):  
+        if not global_serial_module.open(USBPort):  
             logger.error(f"Failed to open serial port {USBPort}. Please check the connection and port settings.")
             return
 
@@ -110,23 +118,23 @@ def main():
         logger.info(f"Set threshold to {args.threshold}")
 
         logger.info("Initializing PvRecorder...")
-        recorder = PvRecorder(frame_length=vt.frame_size)
+        global_recorder = PvRecorder(frame_length=vt.frame_size)
 
         if not ensure_serial_connection():
             logger.error("Failed to ensure serial connection. Exiting.")
             return
 
         logger.info("Playing trigger with logo...")
-        display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+        global_display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not should_exit.is_set():
             logger.info("Listening for wake word...")
-            recorder.start()
+            global_recorder.start()
             wake_word_detected = False
 
             while not wake_word_detected and not should_exit.is_set():
                 try:
-                    audio_frame = recorder.read()
+                    audio_frame = global_recorder.read()
                     audio_data = np.array(audio_frame, dtype=np.int16)
                     detections = vt.process(audio_data)
                     if any(detections):
@@ -138,9 +146,9 @@ def main():
                         time.sleep(0.5)
                 except OSError as e:
                     logger.error(f"Stream error: {e}. Reopening stream.")
-                    recorder.stop()
-                    recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
-                    recorder.start()
+                    global_recorder.stop()
+                    global_recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
+                    global_recorder.start()
 
             if should_exit.is_set():
                 logger.info("Exit signal received. Breaking main loop.")
@@ -162,7 +170,7 @@ def main():
                     break
                 
                 logger.info("Starting listening display...")
-                display.start_listening_display(SatoruHappy)
+                global_display.start_listening_display(SatoruHappy)
 
                 logger.info("Recording audio...")
                 frames = record_audio(vt.frame_size)
@@ -172,7 +180,7 @@ def main():
                     break
 
                 logger.info("Stopping listening display...")
-                display.stop_listening_display()
+                global_display.stop_listening_display()
 
                 if len(frames) < int(RATE / vt.frame_size * RECORD_SECONDS):
                     logger.info("Recording was incomplete. Skipping processing.")
@@ -188,7 +196,6 @@ def main():
                     wf.setframerate(RATE)
                     wf.writeframes(b''.join(frames))
 
-                
                 try:
                     logger.info("Processing audio with AI...")
                     response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
@@ -198,7 +205,7 @@ def main():
                             logger.error("Failed to ensure serial connection. Skipping response playback.")
                             break
                         logger.info("Syncing audio and gif...")
-                        sync_audio_and_gif(display, response_file, SpeakingGif)
+                        sync_audio_and_gif(global_display, response_file, SpeakingGif)
                         if conversation_ended:
                             logger.info("AI has determined the conversation has ended.")
                             conversation_active = False
@@ -214,7 +221,7 @@ def main():
                     logger.error(f"OpenAI Error: {e}")
                     error_message = ai_client.handle_openai_error(e)
                     ai_client.fallback_text_to_speech(error_message, AIOutputAudio)
-                    sync_audio_and_gif(display, AIOutputAudio, SpeakingGif)
+                    sync_audio_and_gif(global_display, AIOutputAudio, SpeakingGif)
                     conversation_active = False
 
             if not ensure_serial_connection():
@@ -222,20 +229,13 @@ def main():
                 break
 
             logger.info("Fading in logo...")
-            display.fade_in_logo(SeamanLogo)   
+            global_display.fade_in_logo(SeamanLogo)   
             logger.info("Conversation ended. Returning to wake word detection.")
         
             should_exit.wait(timeout=0.1)
 
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-    finally:
-        logger.info("Entering cleanup phase...")
-        try:
-            clean(recorder, serial_module, display)
-        except Exception as e:
-            logger.error(f"Error during cleanup: {e}", exc_info=True)
-        logger.info("Exiting program")
 
 if __name__ == '__main__':
     try:
@@ -244,3 +244,5 @@ if __name__ == '__main__':
         logger.info("KeyboardInterrupt received. Initiating shutdown...")
     finally:
         logger.info("Program execution completed.")
+        # Force the atexit functions to run
+        atexit._run_exitfuncs()
