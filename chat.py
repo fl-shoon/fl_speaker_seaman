@@ -62,20 +62,20 @@ def input_thread_function(should_exit):
             if is_terminal():
                 key = get_key()
                 if key == 'q':
-                    logger.info("Quit command received. Initiating shutdown...")
+                    print("Quit command received. Initiating shutdown...")
                     should_exit.set()
                     break
             else:
                 user_input = input("Press 'q' and Enter to quit: ")
                 if user_input.lower() == 'q':
-                    logger.info("Quit command received. Initiating shutdown...")
+                    print("Quit command received. Initiating shutdown...")
                     should_exit.set()
                     break
         except EOFError:
-            logger.warning("EOF encountered while reading input. Exiting input thread.")
+            print("EOF encountered while reading input. Exiting input thread.")
             break
         except Exception as e:
-            logger.error(f"Error in input thread: {e}")
+            print(f"Error in input thread: {e}")
             break
         time.sleep(0.1)
 
