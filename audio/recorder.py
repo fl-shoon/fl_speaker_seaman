@@ -1,8 +1,11 @@
 import pyaudio
 import numpy as np
 import logging
-from etc.define import *
+# from etc.define import *
 import webrtcvad # type: ignore
+
+RATE = 16000
+CHANNELS = 1
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
