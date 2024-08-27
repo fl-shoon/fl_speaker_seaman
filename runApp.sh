@@ -34,34 +34,15 @@ cleanup() {
     if [ ! -z "$PYTHON_PID" ]; then
         echo "Sending termination signal to Python script..."
         kill -TERM "$PYTHON_PID"
-        
-        # Wait for the Python script to finish its cleanup with a timeout
+
+        # Wait for the Python script to finish its cleanup
         echo "Waiting for Python script to finish cleanup..."
-        timeout 30s tail --pid=$PYTHON_PID -f /dev/null
-        if [ $? -eq 124 ]; then
-            echo "Timeout reached. Python script did not exit gracefully."
-            kill -9 "$PYTHON_PID"
-        else
-            echo "Python script has finished."
-        fi
+        wait "$PYTHON_PID"
+        echo "Python script has finished."
     fi
     deactivate
     exit 0
 }
-# cleanup() {
-#     echo "Cleaning up..."
-#     if [ ! -z "$PYTHON_PID" ]; then
-#         echo "Sending termination signal to Python script..."
-#         kill -TERM "$PYTHON_PID"
-        
-#         # Wait for the Python script to finish its cleanup
-#         echo "Waiting for Python script to finish cleanup..."
-#         wait "$PYTHON_PID"
-#         echo "Python script has finished."
-#     fi
-#     deactivate
-#     exit 0
-# }
 
 # Set up trap to catch Ctrl+C and other termination signals
 trap cleanup SIGINT SIGTERM
@@ -90,9 +71,7 @@ export OPENAI_API_KEY='key'
 # Function to run the main program
 run_main_program() {
     echo "Starting AI Speaker System..."
-    python3 test.py &
-    PYTHON_PID=$!
-    wait "$PYTHON_PID"
+    python3 debug.py 
     exit_code=$?
 
     if [ $exit_code -eq 1 ]; then

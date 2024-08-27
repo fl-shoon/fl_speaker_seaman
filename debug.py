@@ -30,10 +30,12 @@ global_serial_module = None
 global_display = None
 exit_flag = False
 
-def signal_handler(signum):
+def signal_handler(signum, frame):
     global exit_flag
     logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
     exit_flag = True
+    clean()
+    sys.exit(0)
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
@@ -224,7 +226,7 @@ def main():
 
                 if exit_flag:
                     break
-                
+
                 if not ensure_serial_connection():
                     logger.error("Failed to ensure serial connection. Exiting main loop.")
                     break
@@ -247,4 +249,9 @@ def main():
         logger.info("Program execution completed.")
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Ensuring cleanup...")
+    finally:
+        logging.shutdown()
