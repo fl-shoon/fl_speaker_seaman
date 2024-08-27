@@ -11,7 +11,7 @@ from pvrecorder import PvRecorder
 
 # Audio
 from audio.player import play_audio, sync_audio_and_gif
-from audio.saver import record_audio
+from audio.recorder import record_audio
 
 # Variables
 from etc.define import *
@@ -270,7 +270,9 @@ def main():
             should_exit.wait(timeout=0.1)
 
     except Exception as e:
-        print(f"An unexpected error occurred: {e}", exc_info=True)
+        print(f"An unexpected error occurred: {e}")
+        input_thread.join(timeout=1)
+        atexit._run_exitfuncs()
     finally:
         input_thread.join(timeout=1)
 
