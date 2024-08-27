@@ -28,48 +28,49 @@ logger = logging.getLogger(__name__)
 global_recorder = None
 global_serial_module = None
 global_display = None
+exit_flag = False
 
-def signal_handler(signum, frame):
+def signal_handler(signum):
+    global exit_flag
     logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
-    clean()
-    sys.exit(0)
+    exit_flag = True
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
 def clean():
-    print("Starting cleanup process...")
+    logger.info("Starting cleanup process...")
     global global_recorder, global_serial_module, global_display
 
     if global_recorder:
-        print("Stopping and deleting recorder...")
+        logger.info("Stopping and deleting recorder...")
         try:
             global_recorder.stop()
             global_recorder.delete()
-            print("Recorder stopped and deleted successfully.")
+            logger.info("Recorder stopped and deleted successfully.")
         except Exception as e:
-            print(f"Error while stopping recorder: {e}")
+            logger.error(f"Error while stopping recorder: {e}")
 
     if global_display:
-        print("Sending white frames...")
+        logger.info("Sending white frames...")
         try:
             global_display.send_white_frames()
-            print("White frames sent successfully.")
+            logger.info("White frames sent successfully.")
         except Exception as e:
-            print(f"Error while sending white frames: {e}")
+            logger.error(f"Error while sending white frames: {e}")
 
     if global_serial_module:
-        print("Closing serial connection...")
+        logger.info("Closing serial connection...")
         try:
             global_serial_module.close()
-            print("Serial connection closed successfully.")
+            logger.info("Serial connection closed successfully.")
         except Exception as e:
-            print(f"Error while closing serial connection: {e}")
+            logger.error(f"Error while closing serial connection: {e}")
 
-    print("Cleanup process completed.")
+    logger.info("Cleanup process completed.")
 
 def main():
-    global global_recorder, global_serial_module, global_display
+    global global_recorder, global_serial_module, global_display, exit_flag
     
     def ensure_serial_connection():
         if not global_serial_module.isPortOpen:
@@ -122,106 +123,121 @@ def main():
         logger.info("Playing trigger with logo...")
         global_display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
-        while True:
-            logger.info("Listening for wake word...")
-            global_recorder.start()
-            wake_word_detected = False
+        while not exit_flag:
+            try:
+                logger.info("Listening for wake word...")
+                global_recorder.start()
+                wake_word_detected = False
 
-            while not wake_word_detected:
-                try:
-                    audio_frame = global_recorder.read()
-                    audio_data = np.array(audio_frame, dtype=np.int16)
-                    detections = vt.process(audio_data)
-                    if any(detections):
-                        logger.info(f"Wake word detected at {datetime.now()}")
-                        wake_word_detected = True
-                        detected_keyword = detections.index(max(detections))
-                        logger.info(f"Detected keyword: {detected_keyword}")
-                        play_audio(ResponseAudio)
-                        time.sleep(0.5)
-                except OSError as e:
-                    logger.error(f"Stream error: {e}. Reopening stream.")
-                    global_recorder.stop()
-                    global_recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
-                    global_recorder.start()
+                while not wake_word_detected and not exit_flag:
+                    try:
+                        audio_frame = global_recorder.read()
+                        audio_data = np.array(audio_frame, dtype=np.int16)
+                        detections = vt.process(audio_data)
+                        if any(detections):
+                            logger.info(f"Wake word detected at {datetime.now()}")
+                            wake_word_detected = True
+                            detected_keyword = detections.index(max(detections))
+                            logger.info(f"Detected keyword: {detected_keyword}")
+                            play_audio(ResponseAudio)
+                            time.sleep(0.5)
+                    except OSError as e:
+                        logger.error(f"Stream error: {e}. Reopening stream.")
+                        global_recorder.stop()
+                        global_recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
+                        global_recorder.start()
 
-            if not ensure_serial_connection():
-                logger.error("Failed to ensure serial connection. Exiting main loop.")
-                break
+                if exit_flag:
+                    break
 
-            ai_client.reset_conversation()
-            
-            conversation_active = True
-            silence_count = 0
-            max_silence = 2
-
-            while conversation_active:
                 if not ensure_serial_connection():
-                    logger.error("Failed to ensure serial connection. Ending conversation.")
+                    logger.error("Failed to ensure serial connection. Exiting main loop.")
+                    break
+
+                ai_client.reset_conversation()
+                
+                conversation_active = True
+                silence_count = 0
+                max_silence = 2
+
+                while conversation_active and not exit_flag:
+                    if not ensure_serial_connection():
+                        logger.error("Failed to ensure serial connection. Ending conversation.")
+                        break
+                    
+                    logger.info("Starting listening display...")
+                    global_display.start_listening_display(SatoruHappy)
+
+                    logger.info("Recording audio...")
+                    audio_data = record_audio()
+
+                    if audio_data is None:
+                        logger.info("No speech detected. Resuming wake word detection.")
+                        conversation_active = False
+                        continue
+
+                    if exit_flag:
+                        break
+
+                    if not ensure_serial_connection():
+                        logger.error("Failed to ensure serial connection. Skipping audio processing.")
+                        break
+
+                    logger.info("Stopping listening display...")
+                    global_display.stop_listening_display()
+
+                    logger.info("Saving recorded audio...")
+
+                    with wave.open(AIOutputAudio, 'wb') as wf:
+                        wf.setnchannels(CHANNELS)
+                        wf.setsampwidth(2)  # 16-bit
+                        wf.setframerate(RATE)
+                        wf.writeframes(b''.join(audio_data))
+
+                    try:
+                        logger.info("Processing audio with AI...")
+                        response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
+
+                        if response_file:
+                            if not ensure_serial_connection():
+                                logger.error("Failed to ensure serial connection. Skipping response playback.")
+                                break
+                            logger.info("Syncing audio and gif...")
+                            sync_audio_and_gif(global_display, response_file, SpeakingGif)
+                            if conversation_ended:
+                                logger.info("AI has determined the conversation has ended.")
+                                conversation_active = False
+                            elif not ai_client.get_last_user_message().strip():
+                                silence_count += 1
+                                if silence_count >= max_silence:
+                                    logger.info("Maximum silence reached. Ending conversation.")
+                                    conversation_active = False
+                        else:
+                            logger.info("No response generated. Resuming wake word detection.")
+                            conversation_active = False
+                    except OpenAIError as e:
+                        logger.error(f"OpenAI Error: {e}")
+                        error_message = ai_client.handle_openai_error(e)
+                        ai_client.fallback_text_to_speech(error_message, AIOutputAudio)
+                        sync_audio_and_gif(global_display, AIOutputAudio, SpeakingGif)
+                        conversation_active = False
+
+                if exit_flag:
                     break
                 
-                logger.info("Starting listening display...")
-                global_display.start_listening_display(SatoruHappy)
-
-                logger.info("Recording audio...")
-                audio_data = record_audio()
-
-                if audio_data is None:
-                    logger.info("No speech detected. Resuming wake word detection.")
-                    conversation_active = False
-                    continue
-
                 if not ensure_serial_connection():
-                    logger.error("Failed to ensure serial connection. Skipping audio processing.")
+                    logger.error("Failed to ensure serial connection. Exiting main loop.")
                     break
 
-                logger.info("Stopping listening display...")
-                global_display.stop_listening_display()
+                logger.info("Fading in logo...")
+                global_display.fade_in_logo(SeamanLogo)   
+                logger.info("Conversation ended. Returning to wake word detection.")
+            except Exception as e:
+                logger.error(f"Error in main loop: {e}", exc_info=True)
+                if exit_flag:
+                    break
+                time.sleep(1)
 
-                logger.info("Saving recorded audio...")
-
-                with wave.open(AIOutputAudio, 'wb') as wf:
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(2)  # 16-bit
-                    wf.setframerate(RATE)
-                    wf.writeframes(b''.join(audio_data))
-
-                try:
-                    logger.info("Processing audio with AI...")
-                    response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
-
-                    if response_file:
-                        if not ensure_serial_connection():
-                            logger.error("Failed to ensure serial connection. Skipping response playback.")
-                            break
-                        logger.info("Syncing audio and gif...")
-                        sync_audio_and_gif(global_display, response_file, SpeakingGif)
-                        if conversation_ended:
-                            logger.info("AI has determined the conversation has ended.")
-                            conversation_active = False
-                        elif not ai_client.get_last_user_message().strip():
-                            silence_count += 1
-                            if silence_count >= max_silence:
-                                logger.info("Maximum silence reached. Ending conversation.")
-                                conversation_active = False
-                    else:
-                        logger.info("No response generated. Resuming wake word detection.")
-                        conversation_active = False
-                except OpenAIError as e:
-                    logger.error(f"OpenAI Error: {e}")
-                    error_message = ai_client.handle_openai_error(e)
-                    ai_client.fallback_text_to_speech(error_message, AIOutputAudio)
-                    sync_audio_and_gif(global_display, AIOutputAudio, SpeakingGif)
-                    conversation_active = False
-
-            if not ensure_serial_connection():
-                logger.error("Failed to ensure serial connection. Exiting main loop.")
-                break
-
-            logger.info("Fading in logo...")
-            global_display.fade_in_logo(SeamanLogo)   
-            logger.info("Conversation ended. Returning to wake word detection.")
-        
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Initiating shutdown...")
     except Exception as e:

@@ -35,14 +35,33 @@ cleanup() {
         echo "Sending termination signal to Python script..."
         kill -TERM "$PYTHON_PID"
         
-        # Wait for the Python script to finish its cleanup
+        # Wait for the Python script to finish its cleanup with a timeout
         echo "Waiting for Python script to finish cleanup..."
-        wait "$PYTHON_PID"
-        echo "Python script has finished."
+        timeout 30s tail --pid=$PYTHON_PID -f /dev/null
+        if [ $? -eq 124 ]; then
+            echo "Timeout reached. Python script did not exit gracefully."
+            kill -9 "$PYTHON_PID"
+        else
+            echo "Python script has finished."
+        fi
     fi
     deactivate
     exit 0
 }
+# cleanup() {
+#     echo "Cleaning up..."
+#     if [ ! -z "$PYTHON_PID" ]; then
+#         echo "Sending termination signal to Python script..."
+#         kill -TERM "$PYTHON_PID"
+        
+#         # Wait for the Python script to finish its cleanup
+#         echo "Waiting for Python script to finish cleanup..."
+#         wait "$PYTHON_PID"
+#         echo "Python script has finished."
+#     fi
+#     deactivate
+#     exit 0
+# }
 
 # Set up trap to catch Ctrl+C and other termination signals
 trap cleanup SIGINT SIGTERM
