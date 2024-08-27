@@ -4,7 +4,7 @@ from etc.define import *
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def record_audio(frame_size, device_name_pattern="USB PnP Sound Device"):
+def record_audio(frame_size):
     p = pyaudio.PyAudio()
 
     stream = p.open(format=FORMAT,  

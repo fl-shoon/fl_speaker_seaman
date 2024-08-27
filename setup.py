@@ -48,6 +48,7 @@ class RaspberryPiSetup:
             "pvrecorder",
             "openai",
             "PyAudio",
+            "webrtcvad",
             "rx",
             "Pillow",
             "numpy"

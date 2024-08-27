@@ -1,71 +1,74 @@
 import pyaudio
 import numpy as np
-import time
 import logging
 from etc.define import *
+import webrtcvad # type: ignore
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def is_silent(data_chunk, threshold=100):
-    """Check if the audio chunk is silent."""
-    amplified_chunk = np.frombuffer(data_chunk, dtype=np.int16) * 5  # Amplify the signal
-    max_amplitude = np.max(np.abs(amplified_chunk))
-    logger.debug(f"Max amplitude: {max_amplitude}")
-    return max_amplitude < threshold
+class InteractiveRecorder:
+    def __init__(self, vad_aggressiveness=3):
+        self.p = pyaudio.PyAudio()
+        self.vad = webrtcvad.Vad(vad_aggressiveness)
+        self.stream = None
 
-def record_audio(frame_size, silence_threshold=100, silence_duration=1.5, max_duration=10, min_duration=0.5):
-    p = pyaudio.PyAudio()
+    def start_stream(self):
+        self.stream = self.p.open(format=pyaudio.paInt16,
+                                  channels=CHANNELS,
+                                  rate=RATE,
+                                  input=True,
+                                  frames_per_buffer=CHUNK)
 
-    stream = p.open(format=FORMAT,
-                    channels=CHANNELS,
-                    rate=RATE,
-                    input=True,
-                    frames_per_buffer=frame_size)
+    def stop_stream(self):
+        if self.stream:
+            self.stream.stop_stream()
+            self.stream.close()
+        self.p.terminate()
 
-    logger.info("* recording started")
-    frames = []
-    silent_time = 0
-    start_time = time.time()
-    has_speech = False
-    last_audio_time = start_time
-    speech_duration = 0
-
-    while True:
-        current_time = time.time()
-        chunk = stream.read(frame_size)
+    def record_question(self, silence_threshold=0.03, silence_duration=1.0):
+        self.start_stream()
+        print("Listening... Speak your question.")
         
-        if not is_silent(chunk, silence_threshold):
-            if not has_speech:
-                logger.info("Speech detected")
-            has_speech = True
-            last_audio_time = current_time
-            silent_time = 0
-            speech_duration += current_time - last_audio_time
-        elif has_speech:
-            silent_time += current_time - last_audio_time
-            logger.debug(f"Silent for {silent_time:.2f} seconds")
-
-        frames.append(chunk)
-
-        elapsed_time = current_time - start_time
-        if has_speech and (silent_time >= silence_duration or speech_duration >= 5) and elapsed_time >= min_duration:
-            logger.info(f"Stopping recording. Total duration: {elapsed_time:.2f} seconds")
-            break
+        frames = []
+        silent_frames = 0
+        is_speaking = False
         
-        if elapsed_time >= max_duration:
-            logger.info(f"Reached maximum duration of {max_duration} seconds")
-            break
+        while True:
+            data = self.stream.read(CHUNK)
+            frames.append(data)
+            
+            # Convert audio chunk to float32 for level detection
+            audio_chunk = np.frombuffer(data, dtype=np.int16)
+            audio_level = np.abs(audio_chunk).mean()
+            
+            # Voice activity detection
+            is_speech = self.vad.is_speech(data, RATE)
+            
+            if is_speech and not is_speaking:
+                print("Speech detected. Recording...")
+                is_speaking = True
+                silent_frames = 0
+            elif not is_speech and is_speaking:
+                silent_frames += 1
+                if silent_frames > silence_duration * (RATE / CHUNK):
+                    print("End of speech detected.")
+                    break
+            elif audio_level < silence_threshold * 32767:  # Convert threshold to 16-bit scale
+                silent_frames += 1
+                if silent_frames > silence_duration * (RATE / CHUNK):
+                    if is_speaking:
+                        print("End of speech detected.")
+                        break
+                    else:
+                        print("No speech detected. Please try again.")
+                        return None
+            else:
+                silent_frames = 0
+        
+        self.stop_stream()
+        return b''.join(frames)
 
-    logger.info("* recording finished")
-
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
-
-    if not has_speech or (time.time() - start_time) < min_duration:
-        logger.warning("No speech detected or recording too short")
-        return []
-
-    logger.info(f"Recorded {len(frames)} frames")
-    return frames
+def record_audio():
+    recorder = InteractiveRecorder()
+    return recorder.record_question()
