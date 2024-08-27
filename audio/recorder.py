@@ -12,13 +12,15 @@ class InteractiveRecorder:
         self.p = pyaudio.PyAudio()
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.stream = None
+        self.CHUNK_DURATION_MS = 30  # 30ms chunk duration for VAD
+        self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
 
     def start_stream(self):
         self.stream = self.p.open(format=pyaudio.paInt16,
                                   channels=CHANNELS,
                                   rate=RATE,
                                   input=True,
-                                  frames_per_buffer=CHUNK)
+                                  frames_per_buffer=self.CHUNK_SIZE)
 
     def stop_stream(self):
         if self.stream:
@@ -35,7 +37,7 @@ class InteractiveRecorder:
         is_speaking = False
         
         while True:
-            data = self.stream.read(CHUNK)
+            data = self.stream.read(self.CHUNK_SIZE)
             frames.append(data)
             
             # Convert audio chunk to float32 for level detection
@@ -43,7 +45,11 @@ class InteractiveRecorder:
             audio_level = np.abs(audio_chunk).mean()
             
             # Voice activity detection
-            is_speech = self.vad.is_speech(data, RATE)
+            try:
+                is_speech = self.vad.is_speech(data, RATE)
+            except Exception as e:
+                logger.error(f"VAD error: {e}")
+                is_speech = False
             
             if is_speech and not is_speaking:
                 print("Speech detected. Recording...")
@@ -51,12 +57,12 @@ class InteractiveRecorder:
                 silent_frames = 0
             elif not is_speech and is_speaking:
                 silent_frames += 1
-                if silent_frames > silence_duration * (RATE / CHUNK):
+                if silent_frames > silence_duration * (RATE / self.CHUNK_SIZE):
                     print("End of speech detected.")
                     break
             elif audio_level < silence_threshold * 32767:  # Convert threshold to 16-bit scale
                 silent_frames += 1
-                if silent_frames > silence_duration * (RATE / CHUNK):
+                if silent_frames > silence_duration * (RATE / self.CHUNK_SIZE):
                     if is_speaking:
                         print("End of speech detected.")
                         break
