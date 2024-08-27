@@ -1,7 +1,6 @@
 import pyaudio
 import numpy as np
 import logging
-# from etc.define import *
 import webrtcvad # type: ignore
 
 RATE = 16000
@@ -41,44 +40,48 @@ class InteractiveRecorder:
         is_speaking = False
         speech_frames = 0
         total_frames = 0
+        speech_start_frame = 0
 
         while True:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
             frames.append(data)
             total_frames += 1
 
-            # Convert audio chunk to float32 for level detection
             audio_chunk = np.frombuffer(data, dtype=np.int16)
-            audio_level = np.abs(audio_chunk).mean()
+            audio_level = np.abs(audio_chunk).mean() / 32767  # Normalize to 0-1 range
 
-            # Voice activity detection (VAD)
             try:
                 is_speech = self.vad.is_speech(data, RATE)
             except Exception as e:
                 logger.error(f"VAD error: {e}")
                 is_speech = False
 
-            logger.debug(f"Frame {total_frames}: Audio level: {audio_level}, Is speech: {is_speech}")
+            logger.debug(f"Frame {total_frames}: Audio level: {audio_level:.4f}, Is speech: {is_speech}")
 
-            if is_speech or audio_level > silence_threshold * 32767:
+            if is_speech and audio_level > silence_threshold:
                 speech_frames += 1
                 silent_frames = 0
-                if not is_speaking and speech_frames > 2: 
+                if not is_speaking and speech_frames > 3:  # Require 3 consecutive speech frames
                     logger.info("Speech detected. Recording...")
                     is_speaking = True
+                    speech_start_frame = total_frames - speech_frames
             else:
                 silent_frames += 1
-                speech_frames = max(0, speech_frames - 1)  
+                speech_frames = 0
 
             if is_speaking:
                 if silent_frames > silence_duration * (RATE / self.CHUNK_SIZE):
-                    logger.info(f"End of speech detected. Total frames: {total_frames}")
-                    break
-            elif total_frames > 5 * RATE / self.CHUNK_SIZE:  # 5 seconds of initial silence
-                logger.info(f"No speech detected. Total frames: {total_frames}")
+                    if total_frames - speech_start_frame > 1.5 * (RATE / self.CHUNK_SIZE):  # Ensure at least 1.5 seconds of speech
+                        logger.info(f"End of speech detected. Total frames: {total_frames}")
+                        break
+                    else:
+                        logger.debug("Short speech detected, continuing to listen")
+                        is_speaking = False
+                        silent_frames = 0
+            elif total_frames > 10 * RATE / self.CHUNK_SIZE:  # 10 seconds of initial silence
+                logger.info("No speech detected. Stopping recording.")
                 return None
 
-            # Maximum duration check
             if total_frames > max_duration * RATE / self.CHUNK_SIZE:
                 logger.info(f"Maximum duration reached. Total frames: {total_frames}")
                 break
@@ -87,13 +90,13 @@ class InteractiveRecorder:
         return b''.join(frames)
 
 def record_audio():
-    recorder = InteractiveRecorder()
-    return recorder.record_question()
+    recorder = InteractiveRecorder(vad_aggressiveness=2)  # Increased VAD aggressiveness
+    return recorder.record_question(silence_threshold=0.01, silence_duration=1.5)  # Adjusted thresholds
 
 if __name__ == "__main__":
     audio_data = record_audio()
     if audio_data:
-        logger.info(f"Recorded audio length: {len(audio_data) / RATE} seconds")
+        logger.info(f"Recorded audio length: {len(audio_data) / RATE:.2f} seconds")
     else:
         logger.info("No audio recorded")
 # import pyaudio, logging
