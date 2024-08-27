@@ -17,15 +17,12 @@ from audio.recorder import record_audio
 from etc.define import *
 
 # others
-import argparse, time, wave, sys, signal, threading, atexit
-import numpy as np, logging, termios, select, tty, sys, threading
+import argparse, time, wave, sys, signal, logging, numpy as np
 from datetime import datetime
 from openai import OpenAIError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-should_exit = threading.Event()
 
 # Global variables to hold resources that need cleanup
 global_recorder = None
@@ -34,51 +31,16 @@ global_display = None
 
 def signal_handler(signum, frame):
     logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
-    should_exit.set()
+    clean()
+    sys.exit(0)
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
-def is_terminal():
-    return sys.stdin.isatty()
-
-def is_data_available():
-    if is_terminal():
-        return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
-    else:
-        return False  # Non-blocking check not possible in non-terminal environment
-
-def get_key():
-    if is_terminal():
-        old_settings = termios.tcgetattr(sys.stdin)
-        try:
-            tty.setcbreak(sys.stdin.fileno())
-            if is_data_available():
-                return sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-    return None
-
-def input_thread_function(should_exit):
-    while not should_exit.is_set():
-        if is_terminal():
-            key = get_key()
-            if key == 'q':
-                logger.info("Quit command received. Initiating shutdown...")
-                should_exit.set()
-                break
-        else:
-            user_input = input("Press 'q' and Enter to quit: ")
-            if user_input.lower() == 'q':
-                logger.info("Quit command received. Initiating shutdown...")
-                should_exit.set()
-                break
-        time.sleep(0.1)
-
 def clean():
     print("Starting cleanup process...")
     global global_recorder, global_serial_module, global_display
-    
+
     if global_recorder:
         print("Stopping and deleting recorder...")
         try:
@@ -87,7 +49,7 @@ def clean():
             print("Recorder stopped and deleted successfully.")
         except Exception as e:
             print(f"Error while stopping recorder: {e}")
-    
+
     if global_display:
         print("Sending white frames...")
         try:
@@ -95,7 +57,7 @@ def clean():
             print("White frames sent successfully.")
         except Exception as e:
             print(f"Error while sending white frames: {e}")
-    
+
     if global_serial_module:
         print("Closing serial connection...")
         try:
@@ -103,19 +65,12 @@ def clean():
             print("Serial connection closed successfully.")
         except Exception as e:
             print(f"Error while closing serial connection: {e}")
-    
-    print("Cleanup process completed.")
 
-# Register the cleanup function to be called on exit
-atexit.register(clean)
+    print("Cleanup process completed.")
 
 def main():
     global global_recorder, global_serial_module, global_display
     
-    input_thread = threading.Thread(target=input_thread_function, args=(should_exit,))
-    input_thread.daemon = True
-    input_thread.start()
-
     def ensure_serial_connection():
         if not global_serial_module.isPortOpen:
             logger.info("Serial connection closed. Attempting to reopen...")
@@ -167,12 +122,12 @@ def main():
         logger.info("Playing trigger with logo...")
         global_display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
-        while not should_exit.is_set():
+        while True:
             logger.info("Listening for wake word...")
             global_recorder.start()
             wake_word_detected = False
 
-            while not wake_word_detected and not should_exit.is_set():
+            while not wake_word_detected:
                 try:
                     audio_frame = global_recorder.read()
                     audio_data = np.array(audio_frame, dtype=np.int16)
@@ -190,10 +145,6 @@ def main():
                     global_recorder = PvRecorder(device_index=-1, frame_length=vt.frame_size)
                     global_recorder.start()
 
-            if should_exit.is_set():
-                logger.info("Exit signal received. Breaking main loop.")
-                break
-
             if not ensure_serial_connection():
                 logger.error("Failed to ensure serial connection. Exiting main loop.")
                 break
@@ -204,7 +155,7 @@ def main():
             silence_count = 0
             max_silence = 2
 
-            while conversation_active and not should_exit.is_set():
+            while conversation_active:
                 if not ensure_serial_connection():
                     logger.error("Failed to ensure serial connection. Ending conversation.")
                     break
@@ -272,18 +223,13 @@ def main():
             global_display.fade_in_logo(SeamanLogo)   
             logger.info("Conversation ended. Returning to wake word detection.")
         
-            should_exit.wait(timeout=0.1)
-
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Initiating shutdown...")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
     finally:
-        input_thread.join(timeout=1)
+        clean()
+        logger.info("Program execution completed.")
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received. Initiating shutdown...")
-    finally:
-        logger.info("Program execution completed.")
-        atexit._run_exitfuncs()
+    main()

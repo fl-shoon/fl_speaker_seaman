@@ -34,7 +34,11 @@ cleanup() {
     if [ ! -z "$PYTHON_PID" ]; then
         echo "Sending termination signal to Python script..."
         kill -TERM "$PYTHON_PID"
+        
+        # Wait for the Python script to finish its cleanup
+        echo "Waiting for Python script to finish cleanup..."
         wait "$PYTHON_PID"
+        echo "Python script has finished."
     fi
     deactivate
     exit 0
