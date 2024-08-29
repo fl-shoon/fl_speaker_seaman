@@ -173,7 +173,7 @@ def main():
                     logger.info("Recording audio...")
                     audio_data = record_audio()
 
-                    if audio_data is not None:
+                    if audio_data:
                         logger.info("Saving recorded audio...")
                         with wave.open(AIOutputAudio, 'wb') as wf:
                             wf.setnchannels(CHANNELS)
