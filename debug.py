@@ -179,7 +179,7 @@ def main():
                             wf.setnchannels(CHANNELS)
                             wf.setsampwidth(2)  # 16-bit
                             wf.setframerate(RATE)
-                            wf.writeframes(audio_data)  # audio_data is already bytes, so we can write it directly
+                            wf.writeframes(audio_data)  
                     else:
                         logger.info("No speech detected. Resuming wake word detection.")
                         conversation_active = False
@@ -195,17 +195,9 @@ def main():
                     logger.info("Stopping listening display...")
                     global_display.stop_listening_display()
 
-                    logger.info("Saving recorded audio...")
-
-                    with wave.open(AIOutputAudio, 'wb') as wf:
-                        wf.setnchannels(CHANNELS)
-                        wf.setsampwidth(2)  # 16-bit
-                        wf.setframerate(RATE)
-                        wf.writeframes(b''.join(audio_data))
-
                     try:
                         logger.info("Processing audio with AI...")
-                        response_file, conversation_ended = ai_client.process_audio(AIOutputAudio,AIOutputAudio)
+                        response_file, conversation_ended = ai_client.process_audio(AIOutputAudio, AIOutputAudio)
 
                         if response_file:
                             if not ensure_serial_connection():
