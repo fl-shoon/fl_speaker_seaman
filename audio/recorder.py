@@ -3,7 +3,9 @@ import numpy as np
 import logging
 import webrtcvad # type: ignore
 
-from etc.define import *
+# from etc.define import *
+CHANNELS = 1
+RATE = 16000
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
