@@ -173,7 +173,14 @@ def main():
                     logger.info("Recording audio...")
                     audio_data = record_audio()
 
-                    if audio_data is None:
+                    if audio_data is not None:
+                        logger.info("Saving recorded audio...")
+                        with wave.open(AIOutputAudio, 'wb') as wf:
+                            wf.setnchannels(CHANNELS)
+                            wf.setsampwidth(2)  # 16-bit
+                            wf.setframerate(RATE)
+                            wf.writeframes(audio_data.tobytes())
+                    else:
                         logger.info("No speech detected. Resuming wake word detection.")
                         conversation_active = False
                         continue
