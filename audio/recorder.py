@@ -4,8 +4,6 @@ import logging
 import webrtcvad # type: ignore
 
 from etc.define import *
-# CHANNELS = 1
-# RATE = 16000
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,7 +30,7 @@ class InteractiveRecorder:
             self.stream.close()
         self.p.terminate()
 
-    def record_question(self, silence_threshold=0.0005, silence_duration=2.5, max_duration=30):
+    def record_question(self, silence_threshold=0.0005, silence_duration=1.5, max_duration=15):
         self.start_stream()
         logger.info("Listening... Speak your question.")
 
@@ -63,7 +61,7 @@ class InteractiveRecorder:
             if is_speech or audio_level > silence_threshold:
                 speech_frames += 1
                 silent_frames = 0
-                if not is_speaking and speech_frames > 2:  # Reduced from 3 to 2
+                if not is_speaking and speech_frames > 2:
                     logger.info("Speech detected. Recording...")
                     is_speaking = True
                     speech_start_frame = total_frames - speech_frames
@@ -73,14 +71,9 @@ class InteractiveRecorder:
 
             if is_speaking:
                 if silent_frames > max_silent_frames:
-                    if total_frames - speech_start_frame > 0.5 * (RATE / self.CHUNK_SIZE):  # Reduced from 1.0 to 0.5
-                        logger.info(f"End of speech detected. Total frames: {total_frames}")
-                        break
-                    else:
-                        logger.debug("Short speech detected, continuing to listen")
-                        is_speaking = False
-                        silent_frames = 0
-            elif total_frames > 30 * RATE / self.CHUNK_SIZE:  # Increased from 20 to 30 seconds
+                    logger.info(f"End of speech detected. Total frames: {total_frames}")
+                    break
+            elif total_frames > 10 * RATE / self.CHUNK_SIZE:  # 10 seconds of initial silence
                 logger.info("No speech detected. Stopping recording.")
                 return None
 
@@ -89,8 +82,8 @@ class InteractiveRecorder:
                 break
 
         self.stop_stream()
-        return frames  # Return the list of frames directly, without joining
+        return b''.join(frames)  
 
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=1)
-    return recorder.record_question(silence_threshold=0.0005, silence_duration=2.5)
+    return recorder.record_question(silence_threshold=0.0005, silence_duration=1.5, max_duration=15)

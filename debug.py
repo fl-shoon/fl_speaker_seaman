@@ -179,7 +179,7 @@ def main():
                             wf.setnchannels(CHANNELS)
                             wf.setsampwidth(2)  # 16-bit
                             wf.setframerate(RATE)
-                            wf.writeframes(audio_data.tobytes())
+                            wf.writeframes(audio_data)  # audio_data is already bytes, so we can write it directly
                     else:
                         logger.info("No speech detected. Resuming wake word detection.")
                         conversation_active = False
