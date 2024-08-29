@@ -73,7 +73,7 @@ def clean():
 
 def main():
     global global_recorder, global_serial_module, global_display, exit_flag
-    
+
     def ensure_serial_connection():
         if not global_serial_module.isPortOpen:
             logger.info("Serial connection closed. Attempting to reopen...")
@@ -157,7 +157,7 @@ def main():
                     break
 
                 ai_client.reset_conversation()
-                
+
                 conversation_active = True
                 silence_count = 0
                 max_silence = 2
@@ -166,7 +166,7 @@ def main():
                     if not ensure_serial_connection():
                         logger.error("Failed to ensure serial connection. Ending conversation.")
                         break
-                    
+
                     logger.info("Starting listening display...")
                     global_display.start_listening_display(SatoruHappy)
 
