@@ -3,9 +3,9 @@ import numpy as np
 import logging
 import webrtcvad # type: ignore
 
-# from etc.define import *
-CHANNELS = 1
-RATE = 16000
+from etc.define import *
+# CHANNELS = 1
+# RATE = 16000
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -94,10 +94,3 @@ class InteractiveRecorder:
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=1)
     return recorder.record_question(silence_threshold=0.0005, silence_duration=2.5)
-
-if __name__ == "__main__":
-    audio_data = record_audio()
-    if audio_data:
-        logger.info(f"Recorded audio length: {len(b''.join(audio_data)) / RATE:.2f} seconds")
-    else:
-        logger.info("No audio recorded")
