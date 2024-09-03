@@ -1,26 +1,31 @@
-import pygame, threading, os
+import pygame
+import threading
 from pygame import mixer
+import os
+import sys
 from contextlib import contextmanager
 
 @contextmanager
 def suppress_stdout_stderr():
     """A context manager that redirects stdout and stderr to devnull"""
+    _stdout = sys.stdout
+    _stderr = sys.stderr
+    null = open(os.devnull, 'w')
     try:
-        null = os.open(os.devnull, os.O_RDWR)
-        save_stdout, save_stderr = os.dup(1), os.dup(2)
-        os.dup2(null, 1)
-        os.dup2(null, 2)
+        sys.stdout = null
+        sys.stderr = null
         yield
     finally:
-        os.dup2(save_stdout, 1)
-        os.dup2(save_stderr, 2)
-        os.close(null)
+        sys.stdout = _stdout
+        sys.stderr = _stderr
+        null.close()
 
 # Suppress Pygame welcome message
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 # Initialize Pygame mixer with suppressed output
 with suppress_stdout_stderr():
+    pygame.init()
     mixer.init()
 
 def play_audio(filename):
@@ -34,9 +39,10 @@ def sync_audio_and_gif(display, audio_file, gif_path):
     gif_thread = threading.Thread(target=display.update_gif, args=(gif_path,))
     gif_thread.start()
 
+    clock = pygame.time.Clock()
     while mixer.music.get_busy():
         with suppress_stdout_stderr():
-            pygame.time.Clock().tick(10)
+            clock.tick(10)
 
     gif_thread.join()
     display.send_white_frames()
