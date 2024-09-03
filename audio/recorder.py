@@ -1,24 +1,53 @@
-import pyaudio
+import pyaudio, os
 import numpy as np
 import logging
 import webrtcvad # type: ignore
+
+from contextlib import contextmanager
 
 from etc.define import *
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@contextmanager
+def suppress_stdout_stderr():
+    """A context manager that redirects stdout and stderr to devnull"""
+    try:
+        null = os.open(os.devnull, os.O_RDWR)
+        save_stdout, save_stderr = os.dup(1), os.dup(2)
+        os.dup2(null, 1)
+        os.dup2(null, 2)
+        yield
+    finally:
+        os.dup2(save_stdout, 1)
+        os.dup2(save_stderr, 2)
+        os.close(null)
+
+ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Error: {reason}")
+ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
+
 class InteractiveRecorder:
     def __init__(self, vad_aggressiveness=1):
-        self.p = pyaudio.PyAudio()
+        # self.p = pyaudio.PyAudio()
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.stream = None
         self.CHUNK_DURATION_MS = 30  
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
         logger.debug(f"Chunk size: {self.CHUNK_SIZE}")
 
+        with suppress_stdout_stderr():
+            self.p = pyaudio.PyAudio()
+
+        try:
+            asound = self.p._lib_pa.pa_get_library_by_name('libasound.so.2')
+            asound.snd_lib_error_set_handler(ERROR_HANDLER_FUNC_PTR)
+        except:
+            logger.warning("Failed to set ALSA error handler")
+
     def start_stream(self):
-        self.stream = self.p.open(format=pyaudio.paInt16,
+        with suppress_stdout_stderr():
+            self.stream = self.p.open(format=pyaudio.paInt16,
                                   channels=CHANNELS,
                                   rate=RATE,
                                   input=True,
@@ -87,3 +116,21 @@ class InteractiveRecorder:
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=1)
     return recorder.record_question(silence_threshold=0.0005, silence_duration=1.5, max_duration=15)
+
+# for reference purpose
+'''
+Increased VAD aggressiveness: The VAD was sometimes detecting speech when the audio level was very low. I've increased the default vad_aggressiveness to 2 to make it less sensitive to background noise.
+Adjusted silence threshold: I've lowered the silence_threshold to 0.002 (from 0.01) as the audio levels in your output were generally very low.
+Modified speech detection logic: I've increased the number of consecutive speech frames required to trigger recording from 3 to 5. This should help prevent false starts due to brief noises.
+Implemented a gradual speech frame reduction: Instead of resetting speech frames to 0 immediately, I've added a gradual reduction to allow for small gaps in speech.
+'''
+
+'''
+Reduced VAD aggressiveness from 2 to 1 to make it more sensitive to potential speech.
+Lowered the silence_threshold from 0.002 to 0.001 to detect quieter speech.
+Increased silence_duration from 1.5 to 2.0 seconds to allow for more natural pauses in speech.
+Reduced the number of consecutive speech frames required to trigger recording from 5 to 3.
+Decreased the minimum speech duration from 1.5 seconds to 1.0 seconds to capture shorter utterances.
+Increased the initial silence duration from 10 to 20 seconds before stopping due to no speech.
+Modified the speech detection condition to if is_speech or audio_level > silence_threshold to be more lenient.
+'''

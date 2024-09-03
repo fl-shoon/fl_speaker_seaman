@@ -53,7 +53,7 @@ def clean():
         except Exception as e:
             logger.error(f"Error while stopping recorder: {e}")
 
-    if global_display:
+    if global_display and global_serial_module and global_serial_module.isPortOpen:
         logger.info("Sending white frames...")
         try:
             global_display.send_white_frames()

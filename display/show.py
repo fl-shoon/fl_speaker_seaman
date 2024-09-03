@@ -1,15 +1,30 @@
-import threading
-import time
+import threading, time, io, pygame, os
 from PIL import Image
-import io
-import pygame
 from pygame import mixer
-# from transmission.serialModule import SerialModule
+from contextlib import contextmanager
+
+from audio.player import play_audio
+
+@contextmanager
+def suppress_stdout_stderr():
+    """A context manager that redirects stdout and stderr to devnull"""
+    try:
+        null = os.open(os.devnull, os.O_RDWR)
+        save_stdout, save_stderr = os.dup(1), os.dup(2)
+        os.dup2(null, 1)
+        os.dup2(null, 2)
+        yield
+    finally:
+        os.dup2(save_stdout, 1)
+        os.dup2(save_stderr, 2)
+        os.close(null)
 
 class DisplayModule:
-    # def __init__(self, serial_module=SerialModule):
     def __init__(self, serial_module):
         self.serial_module = serial_module
+        os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+        with suppress_stdout_stderr():
+            pygame.init()
 
     def fade_in_logo(self, logo_path, steps=7):
         img = Image.open(logo_path)
@@ -32,14 +47,14 @@ class DisplayModule:
             time.sleep(0.01)
 
     def play_trigger_with_logo(self, trigger_audio, logo_path):
-        from audio.player import play_audio
         play_audio(trigger_audio)
         
         fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
         fade_thread.start()
 
         while mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
+            with suppress_stdout_stderr():
+                pygame.time.Clock().tick(10)
 
         fade_thread.join()
 
@@ -62,12 +77,6 @@ class DisplayModule:
             self.serial_module.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
-
-    # def start_listening_animation(self):
-    #     from etc.define import SpeakingGif
-    #     self.stop_event = threading.Event()
-    #     self.display_thread = threading.Thread(target=self.display_gif, args=(SpeakingGif, self.stop_event))
-    #     self.display_thread.start()
 
     def display_image(self, image_path):
         try:
@@ -94,13 +103,6 @@ class DisplayModule:
 
         except Exception as e:
             print(f"Error in display_image: {e}")
-
-    # def display_image(self, image_path):
-    #     img = Image.open(image_path)
-    #     img_byte_arr = io.BytesIO()
-    #     img.save(img_byte_arr, format='PNG')
-    #     img_byte_arr = img_byte_arr.getvalue()
-    #     self.serial_module.send_image_data(img_byte_arr)
 
     def start_listening_display(self, image_path):
         self.display_image(image_path)
