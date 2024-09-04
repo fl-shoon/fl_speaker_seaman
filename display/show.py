@@ -1,9 +1,12 @@
-import threading, time, io, pygame, os
+import threading, time, io, pygame, os, logging
 from PIL import Image
 from pygame import mixer
 from contextlib import contextmanager
 
 from audio.player import play_audio
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 @contextmanager
 def suppress_stdout_stderr():
@@ -62,7 +65,7 @@ class DisplayModule:
         frames = self.serial_module.prepare_gif(gif_path)
         all_frames = self.serial_module.precompute_frames(frames)
         
-        print(f"Total pre-computed frames: {len(all_frames)}")
+        logger.info(f"Total pre-computed frames: {len(all_frames)}")
         frame_index = 0
         while mixer.music.get_busy():
             self.serial_module.send_image_data(all_frames[frame_index])
@@ -80,10 +83,10 @@ class DisplayModule:
 
     def display_image(self, image_path):
         try:
-            print(f"Opening image: {image_path}")
+            # logger.info(f"Opening image: {image_path}")
             img = Image.open(image_path)
             width, height = img.size
-            print(f"Image size: {width}x{height}")
+            # logger.info(f"Image size: {width}x{height}")
 
             # Convert image to RGB mode if it's not already
             if img.mode != 'RGB':
@@ -91,18 +94,18 @@ class DisplayModule:
 
             if (width, height) != (240, 240):
                 img = img.resize((240, 240))
-                print("Image resized to 240x240")
+                # logger.info("Image resized to 240x240")
 
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
-            print("Sending image to display...")
+            # logger.info("Sending image to display...")
             self.serial_module.send_image_data(img_byte_arr)
-            print("Image sent to display")
+            # logger.info("Image sent to display")
 
         except Exception as e:
-            print(f"Error in display_image: {e}")
+            logger.warning(f"Error in display_image: {e}")
 
     def start_listening_display(self, image_path):
         self.display_image(image_path)

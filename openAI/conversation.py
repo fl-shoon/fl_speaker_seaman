@@ -5,7 +5,6 @@ from openai import OpenAI, OpenAIError
 from etc.define import ErrorAudio
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 class OpenAIModule:
     def __init__(self):
@@ -112,50 +111,48 @@ class OpenAIModule:
                 return message["content"]
         return ""
 
-    # def process_audio(self, audio_file: str, output_file: str) -> tuple[str, bool]:
-    #     # Speech-to-Text
-    #     stt_text = self.transcribe_audio(audio_file)
-    #     print(f"Transcript: {stt_text}")
-
-    #     # Generate content using OpenAI
-    #     content_response = self.chat(stt_text)
-    #     conversation_ended = '[END_OF_CONVERSATION]' in content_response
-    #     content_response = content_response.replace('[END_OF_CONVERSATION]', '').strip()
-
-    #     print(f"AI response: {content_response}")
-    #     print(f"Conversation ended: {conversation_ended}")
-
-    #     # Text-to-Speech
-    #     self.text_to_speech(content_response, output_file)
-    #     print(f'Audio content written to file "{output_file}"')
-
-    #     return output_file, conversation_ended
-    
-    def process_audio(self, audio_file: str, output_file: str) -> tuple[str, bool]:
+    def process_audio(self, input_audio_file: str) -> tuple[str, bool]:
         try:
+            # Generate output filename
+            base, ext = os.path.splitext(input_audio_file)
+            output_audio_file = f"{base}_response{ext}"
+
             # Speech-to-Text
-            stt_text = self.transcribe_audio(audio_file)
-            print(f"Transcript: {stt_text}")
+            stt_text = self.transcribe_audio(input_audio_file)
+            logging.info(f"Transcript: {stt_text}")
 
             # Generate content using OpenAI
             content_response = self.chat(stt_text)
             conversation_ended = '[END_OF_CONVERSATION]' in content_response
             content_response = content_response.replace('[END_OF_CONVERSATION]', '').strip()
 
-            print(f"AI response: {content_response}")
-            print(f"Conversation ended: {conversation_ended}")
+            logging.info(f"AI response: {content_response}")
+            logging.info(f"Conversation ended: {conversation_ended}")
 
             # Text-to-Speech
-            self.text_to_speech(content_response, output_file)
-            print(f'Audio content written to file "{output_file}"')
+            self.text_to_speech(content_response, output_audio_file)
+            logging.info(f'Audio content written to file "{output_audio_file}"')
 
-            return output_file, conversation_ended
+            return output_audio_file, conversation_ended
 
         except OpenAIError as e:
             error_message = self.handle_openai_error(e)
-            self.text_to_speech(error_message, output_file)
-            return ErrorAudio, True  # End conversation after error
+            output_audio_file = ErrorAudio
+            self.text_to_speech(error_message, output_audio_file)
+            return output_audio_file, True
 
+    def handle_openai_error(self, e: OpenAIError) -> str:
+        if e.code == 'insufficient_quota':
+            logging.error("OpenAI API quota exceeded. Please check your plan and billing details.")
+            return "申し訳ありませんが、システムに一時的な問題が発生しています。後ほど再度お試しください。ただいまシステムを終了します。"
+        elif e.code == 'rate_limit_exceeded':
+            logging.warning(f"Rate limit exceeded. Retrying in {self.retry_delay} seconds...")
+            time.sleep(self.retry_delay)
+            return "少々お待ちください。システムが混み合っています。"
+        else:
+            logging.error(f"OpenAI API error: {e}")
+            return "申し訳ありませんが、エラーが発生しました。ただいまシステムを終了します。"
+        
     def fallback_text_to_speech(self, text: str, output_file: str):
         # Generate a simple beep sound
         duration = 1  # seconds
@@ -173,17 +170,5 @@ class OpenAIModule:
             wf.setframerate(sample_rate)
             wf.writeframes(audio.tobytes())
 
-        logger.warning(f"Fallback TTS used. Original message: {text}")
-        logger.info(f"Fallback audio saved to {output_file}")
-
-    def handle_openai_error(self, e: OpenAIError) -> str:
-        if e.code == 'insufficient_quota':
-            logging.error("OpenAI API quota exceeded. Please check your plan and billing details.")
-            return "申し訳ありませんが、システムに一時的な問題が発生しています。後ほど再度お試しください。ただいまシステムを終了します。"
-        elif e.code == 'rate_limit_exceeded':
-            logging.warning(f"Rate limit exceeded. Retrying in {self.retry_delay} seconds...")
-            time.sleep(self.retry_delay)
-            return "少々お待ちください。システムが混み合っています。"
-        else:
-            logging.error(f"OpenAI API error: {e}")
-            return "申し訳ありませんが、エラーが発生しました。ただいまシステムを終了します。"
+        logging.warning(f"Fallback TTS used. Original message: {text}")
+        logging.info(f"Fallback audio saved to {output_file}")

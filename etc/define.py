@@ -50,10 +50,9 @@ IMAGE_PATHS = {file: os.path.join(IMAGE_DIR, file) for file in IMAGE_FILES}
 GIF_PATHS = {file: os.path.join(GIF_DIR, file) for file in GIF_FILES}
 
 # Audio settings
-# CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
-RATE = 16000
+RATE = 16000 # Higher rates require more CPU power to process in real-time
 RECORD_SECONDS = 8
 
 # File Locations

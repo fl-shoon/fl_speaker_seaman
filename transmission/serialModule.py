@@ -1,7 +1,9 @@
-import serial, time, io
+import serial, time, io, logging
 from PIL import Image
 import numpy as np
-from threading import Timer
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class SerialModule:
     def __init__(self, baud_rate='230400'):
@@ -13,10 +15,10 @@ class SerialModule:
         try:
             self.comm = serial.Serial(tty, self.baud_rate, timeout=0.1)
             self.isPortOpen = True
-            print(f"Port opened successfully at {self.baud_rate} baud")
+            logger.info(f"Port opened successfully at {self.baud_rate} baud")
         except Exception as e:
             self.isPortOpen = False
-            print(f"Failed to open port: {e}")
+            logger.warning(f"Failed to open port: {e}")
         return self.isPortOpen
 
     def send(self, data):
@@ -29,21 +31,21 @@ class SerialModule:
 
     def send_image_data(self, img_data, timeout=5, retries=3):
         if not self.isPortOpen or self.comm is None:
-            print("Serial port is not open")
+            logger.warning("Serial port is not open")
             return False
 
-        print(f"Sending image data of size: {len(img_data)} bytes")
+        # logger.info(f"Sending image data of size: {len(img_data)} bytes")
         
         for attempt in range(retries):
             try:
-                print(f"Attempt {attempt + 1}/{retries} to send image data")
+                # logger.info(f"Attempt {attempt + 1}/{retries} to send image data")
                 self.send_text()
                 self.comm.read_all()  # Clear any remaining data
                 
                 start_time = time.time()
                 bytes_written = self.comm.write(img_data)
                 write_time = time.time() - start_time
-                print(f"Bytes written: {bytes_written}, Time taken: {write_time:.2f} seconds")
+                # logger.info(f"Bytes written: {bytes_written}, Time taken: {write_time:.2f} seconds")
                 
                 self.comm.flush()  # Ensure all data is written
                 
@@ -53,22 +55,22 @@ class SerialModule:
                     if self.comm.in_waiting:
                         self.comm.read_all()
                         # response = self.comm.read_all()
-                        # print(f"Received response after sending image: {response}")
+                        # logger.info(f"Received response after sending image: {response}")
                         return True
                     time.sleep(0.1)
                 
-                print(f"No response received within {timeout} seconds")
+                logger.info(f"No response received within {timeout} seconds")
                 
             except serial.SerialTimeoutException:
-                print(f"Timeout occurred while writing image data (attempt {attempt + 1}/{retries})")
+                logger.warning(f"Timeout occurred while writing image data (attempt {attempt + 1}/{retries})")
             except Exception as e:
-                print(f"Error in send_image_data: {str(e)} (attempt {attempt + 1}/{retries})")
+                logger.warning(f"Error in send_image_data: {str(e)} (attempt {attempt + 1}/{retries})")
             
             if attempt < retries - 1:
-                print("Retrying...")
+                logger.info("Retrying...")
                 time.sleep(1)
         
-        print("Failed to send image data after all retries")
+        logger.warning("Failed to send image data after all retries")
         return False
 
     def fade_image(self, image_path, fade_in=True, steps=20):
@@ -94,18 +96,18 @@ class SerialModule:
 
             success = self.send_image_data(img_byte_arr)
             if not success:
-                print(f"Failed to send image for step {i+1}, continuing to next step")
+                logger.warning(f"Failed to send image for step {i+1}, continuing to next step")
             
             time.sleep(0.05) 
 
     def send_white_frames(self, flash_delay=0.05, max_retries=3, timeout=5):
         white_frame = np.full((240, 240, 3), 255, dtype=np.uint8)
         white_frame_bytes = self.frame_to_bytes(white_frame)
-        print(f"Prepared white frame, size: {len(white_frame_bytes)} bytes")
+        # logger.info(f"Prepared white frame, size: {len(white_frame_bytes)} bytes")
 
         for attempt in range(max_retries):
             try:
-                print(f"Attempt {attempt + 1}/{max_retries} to send white frame")
+                logger.info(f"Attempt {attempt + 1}/{max_retries} to send white frame")
                 start_time = time.time()
                 
                 # Clear any existing data in the serial buffer
@@ -116,38 +118,38 @@ class SerialModule:
                 self.comm.write(b'TEST')
                 time.sleep(0.1)
                 response = self.comm.read_all()
-                print(f"Test message response: {response}")
+                # logger.info(f"Test message response: {response}")
 
                 # Send the actual white frame data
                 bytes_written = self.comm.write(white_frame_bytes)
                 self.comm.flush()
-                print(f"Bytes written: {bytes_written}")
+                # logger.info(f"Bytes written: {bytes_written}")
 
                 # Wait for acknowledgment with timeout
                 ack_received = False
                 while time.time() - start_time < timeout:
                     if self.comm.in_waiting:
                         ack = self.comm.read_all()
-                        print(f"Received acknowledgment: {ack}")
+                        # logger.info(f"Received acknowledgment: {ack}")
                         ack_received = True
                         break
                     time.sleep(0.1)
 
                 if ack_received:
-                    print("White frame sent and acknowledged successfully")
+                    logger.info("Turned screen to white successfully")
                     time.sleep(flash_delay)
                     return True
                 else:
-                    print(f"No acknowledgment received within {timeout} seconds")
+                    logger.info(f"Failed to turn screen into white within {timeout} seconds")
 
             except Exception as e:
-                print(f"Error in send_white_frames: {str(e)}")
+                logger.warning(f"Error in turning white screen: {str(e)}")
 
             if attempt < max_retries - 1:
-                print("Retrying...")
+                logger.info("Retrying...")
                 time.sleep(1)
 
-        print("Failed to send white frames after all retries")
+        logger.warning("Failed to send white frames after all retries")
         return False
 
     def prepare_gif(self, gif_path, target_size=(240, 240)):
@@ -159,7 +161,7 @@ class SerialModule:
                 frame = gif.copy().convert('RGB').resize(target_size)
                 frames.append(np.array(frame))
         except EOFError:
-            pass  # End of frames
+            pass  
         return frames
 
     def frame_to_bytes(self, frame):
@@ -199,7 +201,7 @@ class SerialModule:
         frames = self.prepare_gif(gif_path)
         all_frames = self.precompute_frames(frames)
         
-        print(f"Total pre-computed frames: {len(all_frames)}")
+        # logger.info(f"Total pre-computed frames: {len(all_frames)}")
 
         while True:
             for frame_bytes in all_frames:
@@ -210,4 +212,4 @@ class SerialModule:
         if self.isPortOpen and self.comm is not None:
             self.comm.close()
             self.isPortOpen = False
-            print("Serial connection closed")
+            logger.info("Serial connection closed")

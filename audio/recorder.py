@@ -28,13 +28,18 @@ ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Err
 ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
 
 class InteractiveRecorder:
-    def __init__(self, vad_aggressiveness=1):
-        # self.p = pyaudio.PyAudio()
+    def __init__(self, vad_aggressiveness=1): 
+        '''
+        VAD aggressiveness
+        Increasing the value => less sensitive to background noise
+        But, it can lead to less speech detection performance.
+
+        Decreasing the vlaue => more sensitive to potential speech
+        '''
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.stream = None
         self.CHUNK_DURATION_MS = 30  
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
-        logger.debug(f"Chunk size: {self.CHUNK_SIZE}")
 
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
@@ -60,6 +65,12 @@ class InteractiveRecorder:
         self.p.terminate()
 
     def record_question(self, silence_threshold=0.0005, silence_duration=1.5, max_duration=15):
+        '''
+        Silence_threadshold is so low because mic's audio output levels were generally very low.
+        Setting the small value enhances the detection of quieter speech.
+
+        Increasing silence_duration allows more natural pauses in speech.
+        '''
         self.start_stream()
         logger.info("Listening... Speak your question.")
 
@@ -68,8 +79,19 @@ class InteractiveRecorder:
         is_speaking = False
         speech_frames = 0
         total_frames = 0
-        speech_start_frame = 0
-        max_silent_frames = int(silence_duration * RATE / self.CHUNK_SIZE)
+        
+        '''
+        Consecutive speech to prevent false starts due to brief noises
+        Here, frame value is too small due to mic's audio output quality.
+        '''
+        consecutive_speech_frames = 2
+
+        '''
+        Initial silence duration to decide to stop recording due to no speech
+        '''
+        initial_silence_duration = 10
+
+        max_silent_frames = int(silence_duration * RATE / self.CHUNK_SIZE) # calculates how many silent chunks correspond to the silence_duration
 
         while True:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -77,7 +99,11 @@ class InteractiveRecorder:
             total_frames += 1
 
             audio_chunk = np.frombuffer(data, dtype=np.int16)
-            audio_level = np.abs(audio_chunk).mean() / 32767  
+            audio_level = np.abs(audio_chunk).mean() / 32767 
+            '''
+            32767 is the maximum positive value for a 16-bit signed integer
+            calculates the average absolute amplitude of the audio chunk, normalized to a 0-1 range
+            '''  
 
             try:
                 is_speech = self.vad.is_speech(data, RATE)
@@ -90,11 +116,10 @@ class InteractiveRecorder:
             if is_speech or audio_level > silence_threshold:
                 speech_frames += 1
                 silent_frames = 0
-                if not is_speaking and speech_frames > 2:
+                if not is_speaking and speech_frames > consecutive_speech_frames:
                     logger.info("Speech detected. Recording...")
                     is_speaking = True
-                    speech_start_frame = total_frames - speech_frames
-            else:
+            else: # if no speech is detected
                 silent_frames += 1
                 speech_frames = max(0, speech_frames - 1)
 
@@ -102,7 +127,7 @@ class InteractiveRecorder:
                 if silent_frames > max_silent_frames:
                     logger.info(f"End of speech detected. Total frames: {total_frames}")
                     break
-            elif total_frames > 10 * RATE / self.CHUNK_SIZE:  # 10 seconds of initial silence
+            elif total_frames > initial_silence_duration * RATE / self.CHUNK_SIZE:  
                 logger.info("No speech detected. Stopping recording.")
                 return None
 
@@ -116,21 +141,3 @@ class InteractiveRecorder:
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=1)
     return recorder.record_question(silence_threshold=0.0005, silence_duration=1.5, max_duration=15)
-
-# for reference purpose
-'''
-Increased VAD aggressiveness: The VAD was sometimes detecting speech when the audio level was very low. I've increased the default vad_aggressiveness to 2 to make it less sensitive to background noise.
-Adjusted silence threshold: I've lowered the silence_threshold to 0.002 (from 0.01) as the audio levels in your output were generally very low.
-Modified speech detection logic: I've increased the number of consecutive speech frames required to trigger recording from 3 to 5. This should help prevent false starts due to brief noises.
-Implemented a gradual speech frame reduction: Instead of resetting speech frames to 0 immediately, I've added a gradual reduction to allow for small gaps in speech.
-'''
-
-'''
-Reduced VAD aggressiveness from 2 to 1 to make it more sensitive to potential speech.
-Lowered the silence_threshold from 0.002 to 0.001 to detect quieter speech.
-Increased silence_duration from 1.5 to 2.0 seconds to allow for more natural pauses in speech.
-Reduced the number of consecutive speech frames required to trigger recording from 5 to 3.
-Decreased the minimum speech duration from 1.5 seconds to 1.0 seconds to capture shorter utterances.
-Increased the initial silence duration from 10 to 20 seconds before stopping due to no speech.
-Modified the speech detection condition to if is_speech or audio_level > silence_threshold to be more lenient.
-'''

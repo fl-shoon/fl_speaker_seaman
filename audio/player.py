@@ -1,8 +1,5 @@
-import pygame
-import threading
+import pygame, threading, os, sys
 from pygame import mixer
-import os
-import sys
 from contextlib import contextmanager
 
 @contextmanager

@@ -54,12 +54,12 @@ def clean():
             logger.error(f"Error while stopping recorder: {e}")
 
     if global_display and global_serial_module and global_serial_module.isPortOpen:
-        logger.info("Sending white frames...")
+        logger.info("Turning display white...")
         try:
             global_display.send_white_frames()
-            logger.info("White frames sent successfully.")
+            logger.info("Display turned to white successfully.")
         except Exception as e:
-            logger.error(f"Error while sending white frames: {e}")
+            logger.error(f"Error while turning display white: {e}")
 
     if global_serial_module:
         logger.info("Closing serial connection...")
@@ -110,7 +110,7 @@ def main():
 
         logger.info(f"Initializing Toshiba Voice Trigger with dictionary: {args.vtdic}")
         vt = ToshibaVoiceTrigger(args.vtdic)
-        logger.info(f"Initialized with frame_size: {vt.frame_size}, num_keywords: {vt.num_keywords}")
+        logger.info(f"Initialized Toshiba Voice Trigger with frame_size: {vt.frame_size}, num_keywords: {vt.num_keywords}")
 
         vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, args.threshold)
         logger.info(f"Set threshold to {args.threshold}")
@@ -122,7 +122,6 @@ def main():
             logger.error("Failed to ensure serial connection. Exiting.")
             return
 
-        logger.info("Playing trigger with logo...")
         global_display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not exit_flag:
@@ -167,7 +166,6 @@ def main():
                         logger.error("Failed to ensure serial connection. Ending conversation.")
                         break
 
-                    logger.info("Starting listening display...")
                     global_display.start_listening_display(SatoruHappy)
 
                     logger.info("Recording audio...")
@@ -175,9 +173,10 @@ def main():
 
                     if audio_data:
                         logger.info("Saving recorded audio...")
-                        with wave.open(AIOutputAudio, 'wb') as wf:
+                        input_audio_file = AIOutputAudio
+                        with wave.open(input_audio_file, 'wb') as wf:
                             wf.setnchannels(CHANNELS)
-                            wf.setsampwidth(2)  # 16-bit
+                            wf.setsampwidth(2)  
                             wf.setframerate(RATE)
                             wf.writeframes(audio_data)  
                     else:
@@ -192,18 +191,16 @@ def main():
                         logger.error("Failed to ensure serial connection. Skipping audio processing.")
                         break
 
-                    logger.info("Stopping listening display...")
                     global_display.stop_listening_display()
 
                     try:
                         logger.info("Processing audio with AI...")
-                        response_file, conversation_ended = ai_client.process_audio(AIOutputAudio, AIOutputAudio)
+                        response_file, conversation_ended = ai_client.process_audio(input_audio_file)
 
                         if response_file:
                             if not ensure_serial_connection():
                                 logger.error("Failed to ensure serial connection. Skipping response playback.")
                                 break
-                            logger.info("Syncing audio and gif...")
                             sync_audio_and_gif(global_display, response_file, SpeakingGif)
                             if conversation_ended:
                                 logger.info("AI has determined the conversation has ended.")
@@ -219,8 +216,9 @@ def main():
                     except OpenAIError as e:
                         logger.error(f"OpenAI Error: {e}")
                         error_message = ai_client.handle_openai_error(e)
-                        ai_client.fallback_text_to_speech(error_message, AIOutputAudio)
-                        sync_audio_and_gif(global_display, AIOutputAudio, SpeakingGif)
+                        error_audio_file = ErrorAudio
+                        ai_client.fallback_text_to_speech(error_message, error_audio_file)
+                        sync_audio_and_gif(global_display, error_audio_file, SpeakingGif)
                         conversation_active = False
 
                 if exit_flag:
@@ -230,7 +228,6 @@ def main():
                     logger.error("Failed to ensure serial connection. Exiting main loop.")
                     break
 
-                logger.info("Fading in logo...")
                 global_display.fade_in_logo(SeamanLogo)   
                 logger.info("Conversation ended. Returning to wake word detection.")
             except Exception as e:
