@@ -65,7 +65,7 @@ class DisplayModule:
         frames = self.serial_module.prepare_gif(gif_path)
         all_frames = self.serial_module.precompute_frames(frames)
         
-        logger.info(f"Total pre-computed frames: {len(all_frames)}")
+        # logger.info(f"Total pre-computed frames: {len(all_frames)}")
         frame_index = 0
         while mixer.music.get_busy():
             self.serial_module.send_image_data(all_frames[frame_index])

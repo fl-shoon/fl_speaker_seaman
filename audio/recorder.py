@@ -1,7 +1,7 @@
 import pyaudio, os
 import numpy as np
 import logging
-import webrtcvad # type: ignore
+import webrtcvad 
 
 from contextlib import contextmanager
 
