@@ -2,7 +2,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 from serialModule import SerialModule
 # from transmission.serialModule import SerialModule
-from display.brightness import BrightnessModule
+from brightness import BrightnessModule
+# from display.brightness import BrightnessModule
 
 import RPi.GPIO as GPIO 
 import time, io, math, logging, serial.tools.list_ports
