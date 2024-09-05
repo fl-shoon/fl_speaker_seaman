@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
-from transmission.serialModule import SerialModule
+from serialModule import SerialModule
+# from transmission.serialModule import SerialModule
 from display.brightness import BrightnessModule
 
 import RPi.GPIO as GPIO 
