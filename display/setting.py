@@ -20,7 +20,7 @@ def extract_device():
             result = device
     return result  
 
-class DisplayUI:
+class SettingModule:
     def __init__(self, serial_module):
         self.serial_module = serial_module
         self.background_color = (73, 80, 87)  # Darker gray for the background
@@ -29,6 +29,7 @@ class DisplayUI:
         self.display_size = (240, 240)
         self.highlight_text_color = (0, 0, 0)
         self.icon_size = 24
+        self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
         
         # GPIO setup
         GPIO.setmode(GPIO.BCM)
@@ -50,12 +51,30 @@ class DisplayUI:
         ]
         
         self.selected_item = 1  # Start with the second item selected (輝度/brightness)
-        self.font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 20)
+        self.font = self.load_font()
 
         self.brightness = 1.0  # Full brightness
         self.brightness_control = BrightnessModule(serial_module, self.brightness)
         self.current_menu_image = None
 
+    def load_font(self):
+        font_paths = [
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+            "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",  
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"  
+        ]
+        
+        for font_path in font_paths:
+            try:
+                self.font_path = font_path
+                return ImageFont.truetype(font_path, 20)
+            except IOError:
+                logging.warning(f"Could not load font: {font_path}")
+        
+        logging.error("Could not load any fonts. Using default font.")
+        return ImageFont.load_default()
+    
     def draw_icon(self, draw, icon, position, icon_color=(255, 255, 255)):
         x, y = position
         size = self.icon_size  
@@ -203,9 +222,9 @@ class DisplayUI:
         # Draw navigation buttons
         draw.polygon([(20, 120), (30, 110), (30, 130)], fill=self.text_color)  # Left arrow
         draw.polygon([(220, 120), (210, 110), (210, 130)], fill=self.text_color)  # Right arrow
-        navigationTextFont = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 12)
-        draw.text((20, 135), "戻る", font=navigationTextFont, fill=self.text_color)
-        draw.text((200, 135), "決定", font=navigationTextFont, fill=self.text_color)
+        fixFont = ImageFont.truetype(self.font_path, 12)
+        draw.text((20, 135), "戻る", font=fixFont, fill=self.text_color)
+        draw.text((200, 135), "決定", font=fixFont, fill=self.text_color)
 
         self.current_menu_image = image
         
@@ -267,7 +286,7 @@ class DisplayUI:
 if __name__ == "__main__":
     serial_module = SerialModule()
     if serial_module.open(extract_device()):  
-        ui = DisplayUI(serial_module)
+        ui = SettingModule(serial_module)
         ui.run()
     else:
         logger.info("Failed to open serial port")

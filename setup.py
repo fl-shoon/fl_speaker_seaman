@@ -20,7 +20,12 @@ class RaspberryPiSetup:
 
     def create_virtual_environment(self):
         print(f"Creating virtual environment at {self.venv_path}...")
-        venv.create(self.venv_path, with_pip=True)
+        try:
+            venv.create(self.venv_path, with_pip=True)
+        except Exception as e:
+            print(f"Error creating virtual environment: {e}")
+            print("Attempting to create virtual environment using system command...")
+            self.run_command(f"python3 -m venv {self.venv_path}")
 
     def install_package(self, package_name):
         print(f"Installing {package_name}...")
@@ -33,7 +38,7 @@ class RaspberryPiSetup:
 
     def install_system_dependencies(self):
         print("Installing system dependencies...")
-        dependencies = ["python3-dev", "python3-pip", "portaudio19-dev", "libatlas-base-dev"]
+        dependencies = ["python3-dev", "python3-pip", "portaudio19-dev", "libatlas-base-dev", "fonts-ipafont"]
         for dep in dependencies:
             if not self.run_command(f"sudo apt-get install -y {dep}"):
                 print(f"Failed to install system dependency: {dep}")
@@ -51,7 +56,8 @@ class RaspberryPiSetup:
             "webrtcvad",
             "rx",
             "Pillow",
-            "numpy"
+            "numpy",
+            "RPi.GPIO"
         ]
         for package in packages:
             if not self.install_package(package):
@@ -72,7 +78,12 @@ class RaspberryPiSetup:
         print(f"To activate the virtual environment, run: source {os.path.join(self.venv_path, 'bin', 'activate')}")
         return True
 
+'''
+If the code failed at creating virtual env, run this:
+sudo apt install python3.11-venv
+'''
 if __name__ == "__main__":
     setup = RaspberryPiSetup()
     if not setup.setup():
         sys.exit(1)
+    
