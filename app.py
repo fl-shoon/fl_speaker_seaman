@@ -7,7 +7,7 @@ import numpy as np
 from threading import Event
 
 from openAI.conversation import OpenAIModule
-from audio.player import sync_audio_and_gif
+from audio.player import sync_audio_and_gif, play_audio
 from audio.recorder import record_audio
 from display.show import DisplayModule
 from etc.define import *
@@ -74,6 +74,7 @@ class VoiceAssistant:
                 if any(detections):
                     detected_keyword = detections.index(max(detections))
                     logger.info(f"Wake word detected: {detected_keyword}")
+                    play_audio(ResponseAudio)
                     return True
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
