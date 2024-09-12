@@ -1,206 +1,172 @@
-import argparse, wave, sys, signal
-import numpy as np
+import argparse
 import logging
-from datetime import datetime
+import signal
+import wave
+import time
+import numpy as np
+from threading import Event
 
-# Observer & Reactive Streaming
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from rx import operators as ops
-from rx.subject import Subject
-from rx.scheduler.eventloop import AsyncIOScheduler
-
-# Serial/Display
-from transmission.serialModule import SerialModule
-from display.show import DisplayModule
-
-# AI
 from openAI.conversation import OpenAIModule
-
-# Voice Trigger & Recording 
-from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
-from pvrecorder import PvRecorder 
-
-# Audio
-from audio.player import play_audio, sync_audio_and_gif
+from audio.player import sync_audio_and_gif
 from audio.recorder import record_audio
-
-# Variables
+from display.show import DisplayModule
 from etc.define import *
+from pvrecorder import PvRecorder
+from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
+from transmission.serialModule import SerialModule
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-should_exit = asyncio.Event()
+# Global variables
+exit_event = Event()
 
-def signal_handler(signum, frame):
-    logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
-    asyncio.get_event_loop().call_soon_threadsafe(should_exit.set)
+class VoiceAssistant:
+    def __init__(self, args):
+        self.args = args
+        self.serial_module = None
+        self.display = None
+        self.recorder = None
+        self.vt = None
+        self.ai_client = None
 
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
+    def initialize(self):
+        try:
+            self.serial_module = SerialModule(BautRate)
+            self.display = DisplayModule(self.serial_module)
+            
+            if not self.serial_module.open(USBPort):
+                raise ConnectionError(f"Failed to open serial port {USBPort}")
 
-class KaiwaService:
-    def __init__(self):
-        self.wake_word_subject = Subject()
-        self.conversation_subject = Subject()
-        self.audio_subject = Subject()
+            self.ai_client = OpenAIModule()
+            self.vt = ToshibaVoiceTrigger(self.args.vtdic)
+            self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
+            
+            self.recorder = PvRecorder(frame_length=self.vt.frame_size)
+            
+            logger.info("Voice Assistant initialized successfully")
+        except Exception as e:
+            logger.error(f"Initialization error: {e}")
+            self.cleanup()
+            raise
 
-        self.parser = argparse.ArgumentParser()
-        self.parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
-        self.parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
-        self.args = self.parser.parse_args()
-
-        self.serial_module = SerialModule(BautRate)
-        self.display = DisplayModule(self.serial_module)
-        self.ai_client = OpenAIModule()
-
-        self.vt = ToshibaVoiceTrigger(self.args.vtdic)
-        self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
-
-        self.recorder = PvRecorder(frame_length=self.vt.frame_size)
-        self.loop = asyncio.get_event_loop()
-        self.executor = ThreadPoolExecutor(max_workers=1)
-        self.scheduler = AsyncIOScheduler(asyncio.get_event_loop())
-
-    async def clean(self):
-        logger.info("Cleaning up...")
-        if self.recorder:
-            await self.loop.run_in_executor(self.executor, self.recorder.stop)
-            await self.loop.run_in_executor(self.executor, self.recorder.delete)
-        if self.display:
-            await self.loop.run_in_executor(self.executor, self.display.send_white_frames)
-        if self.serial_module:
-            await self.loop.run_in_executor(self.executor, self.serial_module.close)
-
-    async def ensure_serial_connection(self):
+    def ensure_serial_connection(self):
         if not self.serial_module.isPortOpen:
             logger.info("Serial connection closed. Attempting to reopen...")
-            for attempt in range(3):  # Try to reopen 3 times
-                if await self.loop.run_in_executor(self.executor, self.serial_module.open, USBPort):
+            for attempt in range(3):
+                if self.serial_module.open(USBPort):
                     logger.info("Successfully reopened serial connection.")
                     return True
                 logger.info(f"Attempt {attempt + 1} failed. Retrying in 1 second...")
-                await asyncio.sleep(1)
-            logger.error("Failed to reopen serial connection after 3 attempts. Exiting.")
-            await self.clean()
-            sys.exit(1)
+                time.sleep(1)
+            logger.error("Failed to reopen serial connection after 3 attempts.")
+            return False
         return True
 
-    async def listen_for_wake_word(self):
-        while not should_exit.is_set():
-            try:
-                audio_frame = await self.loop.run_in_executor(self.executor, self.recorder.read)
+    def listen_for_wake_word(self):
+        self.recorder.start()
+        try:
+            while not exit_event.is_set():
+                audio_frame = self.recorder.read()
                 audio_data = np.array(audio_frame, dtype=np.int16)
-                detections = await self.loop.run_in_executor(self.executor, self.vt.process, audio_data)
+                detections = self.vt.process(audio_data)
                 if any(detections):
-                    logger.info(f"Wake word detected at {datetime.now()}")
                     detected_keyword = detections.index(max(detections))
-                    logger.info(f"Detected keyword: {detected_keyword}")
-                    await self.loop.run_in_executor(self.executor, play_audio, ResponseAudio)
-                    await asyncio.sleep(0.5)
+                    logger.info(f"Wake word detected: {detected_keyword}")
                     return True
-            except OSError as e:
-                logger.error(f"Stream error: {e}. Reopening stream.")
-                await self.loop.run_in_executor(self.executor, self.recorder.stop)
-                self.recorder = PvRecorder(device_index=-1, frame_length=self.vt.frame_size)
-                await self.loop.run_in_executor(self.executor, self.recorder.start)
+        except Exception as e:
+            logger.error(f"Error in wake word detection: {e}")
+        finally:
+            self.recorder.stop()
         return False
 
-    async def record_conversation(self):
-        await self.ensure_serial_connection()
-        await self.loop.run_in_executor(self.executor, self.display.start_listening_display, SatoruHappy)
+    def process_conversation(self):
+        conversation_active = True
+        silence_count = 0
+        max_silence = 2
 
-        frames = await self.loop.run_in_executor(self.executor, record_audio, self.vt.frame_size)
+        while conversation_active and not exit_event.is_set():
+            if not self.ensure_serial_connection():
+                break
 
-        await self.ensure_serial_connection()
-        await self.loop.run_in_executor(self.executor, self.display.stop_listening_display)
+            self.display.start_listening_display(SatoruHappy)
+            audio_data = record_audio()
 
-        if len(frames) < int(RATE / self.vt.frame_size * RECORD_SECONDS):
-            logger.info("Recording was incomplete. Skipping processing.")
-            return None
+            if not audio_data:
+                silence_count += 1
+                if silence_count >= max_silence:
+                    logger.info("Maximum silence reached. Ending conversation.")
+                    conversation_active = False
+                continue
 
-        await asyncio.sleep(0.1)
+            input_audio_file = AIOutputAudio
+            with wave.open(input_audio_file, 'wb') as wf:
+                wf.setnchannels(CHANNELS)
+                wf.setsampwidth(2)
+                wf.setframerate(RATE)
+                wf.writeframes(audio_data)
 
-        with wave.open(AIOutputAudio, 'wb') as wf:
-            wf.setnchannels(CHANNELS)
-            wf.setsampwidth(2)  # 16-bit
-            wf.setframerate(RATE)
-            wf.writeframes(b''.join(frames))
+            self.display.stop_listening_display()
 
-        return AIOutputAudio
-
-    async def process_audio(self, audio_file):
-        response_file, conversation_ended = await self.loop.run_in_executor(
-            self.executor, self.ai_client.process_audio, audio_file, AIOutputAudio)
-        
-        if response_file:
-            await self.ensure_serial_connection()
-            await self.loop.run_in_executor(
-                self.executor, sync_audio_and_gif, self.display, response_file, SpeakingGif)
-        
-        return conversation_ended
-
-    async def run(self):
-        try:
-            logger.info(f"Attempting to open serial port {USBPort} at {BautRate} baud...")
-            if not await self.loop.run_in_executor(self.executor, self.serial_module.open, USBPort):  
-                logger.info(f"Failed to open serial port {USBPort}. Please check the connection and port settings.")
-                sys.exit(1)
-            logger.info("Serial port opened successfully.")
-
-            await self.ensure_serial_connection()
-            await self.loop.run_in_executor(self.executor, self.display.play_trigger_with_logo, TriggerAudio, SeamanLogo)
-
-            while not should_exit.is_set():
-                logger.info("Listening for wake word...")
-                await self.loop.run_in_executor(self.executor, self.recorder.start)
-                
-                wake_word_detected = await self.listen_for_wake_word()
-                if not wake_word_detected:
-                    continue
-
-                await self.ensure_serial_connection()
-                await self.loop.run_in_executor(self.executor, self.ai_client.reset_conversation)
-                
-                conversation_active = True
-                silence_count = 0
-                max_silence = 2
-
-                while conversation_active and not should_exit.is_set():
-                    audio_file = await self.record_conversation()
-                    if not audio_file:
-                        conversation_active = False
-                        continue
-
-                    conversation_ended = await self.process_audio(audio_file)
-
+            try:
+                response_file, conversation_ended = self.ai_client.process_audio(input_audio_file)
+                if response_file:
+                    sync_audio_and_gif(self.display, response_file, SpeakingGif)
                     if conversation_ended:
-                        logger.info("AI has determined the conversation has ended.")
                         conversation_active = False
-                    elif not self.ai_client.get_last_user_message().strip():
-                        silence_count += 1
-                        if silence_count >= max_silence:
-                            logger.info("Maximum silence reached. Ending conversation.")
-                            conversation_active = False
-                    else:
-                        silence_count = 0
+                else:
+                    logger.info("No response generated. Ending conversation.")
+                    conversation_active = False
+            except Exception as e:
+                logger.error(f"Error processing conversation: {e}")
+                error_message = self.ai_client.handle_openai_error(e)
+                error_audio_file = ErrorAudio
+                self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
+                sync_audio_and_gif(self.display, error_audio_file, SpeakingGif)
+                conversation_active = False
 
-                await self.ensure_serial_connection()
-                await self.loop.run_in_executor(self.executor, self.display.fade_in_logo, SeamanLogo)   
-                logger.info("Conversation ended. Returning to wake word detection.")
-            
-                await asyncio.sleep(1)
+        self.display.fade_in_logo(SeamanLogo)
 
+    def run(self):
+        try:
+            self.initialize()
+            self.display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+
+            while not exit_event.is_set():
+                if self.listen_for_wake_word():
+                    self.process_conversation()
+
+        except KeyboardInterrupt:
+            logger.info("KeyboardInterrupt received. Shutting down...")
         except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}")
+            logger.error(f"An unexpected error occurred: {e}", exc_info=True)
         finally:
-            logger.info("Graceful shutdown initiated.")
-            await self.clean()
+            self.cleanup()
 
-async def main():
-    kaiwa_service = KaiwaService()
-    await kaiwa_service.run()
+    def cleanup(self):
+        logger.info("Starting cleanup process...")
+        if self.recorder:
+            self.recorder.stop()
+            self.recorder.delete()
+        if self.display and self.serial_module and self.serial_module.isPortOpen:
+            self.display.send_white_frames()
+        if self.serial_module:
+            self.serial_module.close()
+        logger.info("Cleanup process completed.")
+
+def signal_handler(signum, frame):
+    logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
+    exit_event.set()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
+    parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
+    args = parser.parse_args()
+
+    assistant = VoiceAssistant(args)
+    assistant.run()
