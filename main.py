@@ -208,7 +208,7 @@ class ScheduledVoiceAssistant(VoiceAssistant):
                 else:
                     logger.info(f"Waiting for scheduled time. Current time: {now}, Scheduled time: {self.scheduled_time}, Time until scheduled: {time_until_scheduled:.2f} seconds")
                 
-                await asyncio.sleep(min(time_until_scheduled, 60))
+                await asyncio.sleep(60)  
             except Exception as e:
                 logger.error(f"Error in check_schedule: {e}")
                 await asyncio.sleep(60)
