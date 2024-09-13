@@ -2,6 +2,7 @@ import subprocess
 import sys
 import os
 import venv
+import argparse
 
 class RaspberryPiSetup:
     def __init__(self, venv_path=".venv"):
@@ -66,8 +67,9 @@ class RaspberryPiSetup:
                 return False
         return True
 
-    def setup(self):
-        self.update_system()
+    def setup(self, update_system=False):
+        if update_system:
+            self.update_system()
         if not self.install_system_dependencies():
             print("Failed to install system dependencies. Exiting.")
             return False
@@ -79,12 +81,14 @@ class RaspberryPiSetup:
         print(f"To activate the virtual environment, run: source {os.path.join(self.venv_path, 'bin', 'activate')}")
         return True
 
-'''
-If the code failed at creating virtual env, run this:
-sudo apt install python3.11-venv
-'''
-if __name__ == "__main__":
+def main():
+    parser = argparse.ArgumentParser(description="Raspberry Pi Setup Script")
+    parser.add_argument("--update-system", action="store_true", help="Update system before installation")
+    args = parser.parse_args()
+
     setup = RaspberryPiSetup()
-    if not setup.setup():
+    if not setup.setup(update_system=args.update_system):
         sys.exit(1)
-    
+
+if __name__ == "__main__":
+    main()
