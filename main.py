@@ -173,21 +173,29 @@ class ScheduledVoiceAssistant(VoiceAssistant):
         firebase_admin.initialize_app(cred)
         self.db = firestore.client()
         self.db_ref = self.db.collection('schedulers').document('medicine_reminder_time')
+        self.update_schedule()
+
+    def update_schedule(self):
         self.schedule_data = self.db_ref.get().to_dict()
         scheduled_hour = self.schedule_data.get('hour')
         scheduled_minute = self.schedule_data.get('minute')
-        self.now = datetime.datetime.now()
-        self.scheduled_time = self.now.replace(hour=scheduled_hour, minute=scheduled_minute, second=0, microsecond=0)
+        now = datetime.datetime.now()
+        self.scheduled_time = now.replace(hour=scheduled_hour, minute=scheduled_minute, second=0, microsecond=0)
+        if self.scheduled_time <= now:
+            self.scheduled_time += datetime.timedelta(days=1)
 
     async def check_schedule(self):
         while not exit_event.is_set():
             try:
-                if self.scheduled_time and self.now >= self.scheduled_time:
+                now = datetime.datetime.now()
+                if self.scheduled_time and now >= self.scheduled_time:
                     logger.info("Scheduled conversation time reached.")
+                    self.update_schedule()  # Set the next day's schedule
                     return True
+                await asyncio.sleep(60)  # Check every minute
             except Exception as e:
                 logger.error(f"Error checking schedule: {e}")
-            await asyncio.sleep(3)
+                await asyncio.sleep(60)
         return False
     
     async def run(self):
@@ -199,7 +207,10 @@ class ScheduledVoiceAssistant(VoiceAssistant):
                 wake_word_task = asyncio.create_task(self.listen_for_wake_word_async())
                 schedule_task = asyncio.create_task(self.check_schedule())
 
-                done, pending = await asyncio.wait([wake_word_task, schedule_task], return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    [wake_word_task, schedule_task],
+                    return_when=asyncio.FIRST_COMPLETED
+                )
 
                 for task in pending:
                     task.cancel()
@@ -235,4 +246,4 @@ if __name__ == '__main__':
     # assistant.run()
 
     assistant = ScheduledVoiceAssistant(args)
-    asyncio.run(assistant.run)
+    asyncio.run(assistant.run())
