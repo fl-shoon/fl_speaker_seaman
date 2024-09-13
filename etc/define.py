@@ -22,6 +22,12 @@ VOICE_TRIGGER_DIR = os.path.join(ASSETS_DIR, 'trigger')
 # Define the temporary ai output audio file
 TEMP_AUDIO_FILE = os.path.join(AUDIO_DIR, 'output.wav')
 
+# Define the firebase credentials directory
+FIRE_CRED_DIR = os.path.join(PARENT_DIR, 'secrets')
+
+# Define the firebase credentials file
+FIRE_CRED = os.path.join(FIRE_CRED_DIR, 'firebase_admin.json')
+
 # Function to get all files with a specific extension in a directory
 def get_files_with_extension(directory, extension):
     return [f for f in os.listdir(directory) if f.endswith(extension)]

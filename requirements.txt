@@ -6,3 +6,4 @@ pyaudio
 rx
 pillow
 numpy
+firebase-admin

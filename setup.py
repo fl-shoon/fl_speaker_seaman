@@ -57,7 +57,8 @@ class RaspberryPiSetup:
             "rx",
             "Pillow",
             "numpy",
-            "RPi.GPIO"
+            "RPi.GPIO",
+            "firebase-admin"
         ]
         for package in packages:
             if not self.install_package(package):
