@@ -176,28 +176,44 @@ class ScheduledVoiceAssistant(VoiceAssistant):
         self.update_schedule()
 
     def update_schedule(self):
-        self.schedule_data = self.db_ref.get().to_dict()
-        scheduled_hour = self.schedule_data.get('hour')
-        scheduled_minute = self.schedule_data.get('minute')
-        now = datetime.datetime.now()
-        self.scheduled_time = now.replace(hour=scheduled_hour, minute=scheduled_minute, second=0, microsecond=0)
-        if self.scheduled_time <= now:
-            self.scheduled_time += datetime.timedelta(days=1)
+        try:
+            self.schedule_data = self.db_ref.get().to_dict()
+            scheduled_hour = self.schedule_data.get('hour')
+            scheduled_minute = self.schedule_data.get('minute')
+            now = datetime.datetime.now()
+            self.scheduled_time = now.replace(hour=scheduled_hour, minute=scheduled_minute, second=0, microsecond=0)
+            if self.scheduled_time <= now:
+                self.scheduled_time += datetime.timedelta(days=1)
+            logger.info(f"Next scheduled time set to: {self.scheduled_time}")
+        except Exception as e:
+            logger.error(f"Error updating schedule: {e}")
+            self.scheduled_time = None
 
     async def check_schedule(self):
         while not exit_event.is_set():
             try:
                 now = datetime.datetime.now()
-                if self.scheduled_time and now >= self.scheduled_time:
-                    logger.info("Scheduled conversation time reached.")
-                    self.update_schedule()  # Set the next day's schedule
+                if self.scheduled_time is None:
+                    logger.warning("No scheduled time set. Updating schedule...")
+                    self.update_schedule()
+                    await asyncio.sleep(60)
+                    continue
+
+                time_until_scheduled = (self.scheduled_time - now).total_seconds()
+                
+                if time_until_scheduled <= 0:
+                    logger.info(f"Scheduled time reached. Current time: {now}, Scheduled time: {self.scheduled_time}")
+                    self.update_schedule()  
                     return True
-                await asyncio.sleep(60)  # Check every minute
+                else:
+                    logger.info(f"Waiting for scheduled time. Current time: {now}, Scheduled time: {self.scheduled_time}, Time until scheduled: {time_until_scheduled:.2f} seconds")
+                
+                await asyncio.sleep(min(time_until_scheduled, 60))
             except Exception as e:
-                logger.error(f"Error checking schedule: {e}")
+                logger.error(f"Error in check_schedule: {e}")
                 await asyncio.sleep(60)
         return False
-    
+
     async def run(self):
         try:
             self.initialize()
@@ -217,12 +233,15 @@ class ScheduledVoiceAssistant(VoiceAssistant):
 
                 if wake_word_task in done and wake_word_task.result():
                     logger.info("Conversation started by wake word.")
-                    self.process_conversation()
+                    self.process_conversation()  
                 elif schedule_task in done and schedule_task.result():
                     logger.info("Conversation started by schedule.")
-                    self.process_conversation()
+                    self.process_conversation()  
+                else:
+                    logger.warning("No task completed as expected. Restarting loop.")
+
         except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+            logger.error(f"An unexpected error occurred in run: {e}", exc_info=True)
         finally:
             self.cleanup()
 
