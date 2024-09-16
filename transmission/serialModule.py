@@ -41,6 +41,23 @@ class SerialModule:
             logger.warning("Serial port is not open")
             return False
 
+        if isinstance(img_data, bytes):
+            img = Image.open(io.BytesIO(img_data))
+        elif isinstance(img_data, Image.Image):
+            img = img_data
+        else:
+            logger.warning("Unsupported image data type")
+            return False
+
+        # Apply brightness adjustment
+        enhancer = ImageEnhance.Brightness(img)
+        brightened_img = enhancer.enhance(self.current_brightness)
+
+        # Convert the brightened image back to bytes
+        img_byte_arr = io.BytesIO()
+        brightened_img.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+
         for attempt in range(retries):
             try:
                 self.send_text()
@@ -68,20 +85,6 @@ class SerialModule:
         logger.warning("Failed to send image data after all retries")
         return False
 
-    def set_brightness(self, brightness):
-        self.current_brightness = brightness
-
-    def apply_brightness(self, image):
-        enhancer = ImageEnhance.Brightness(image)
-        return enhancer.enhance(self.current_brightness)
-    
-    def send_image_with_brightness(self, image):
-        brightened_image = self.apply_brightness(image)
-        img_byte_arr = io.BytesIO()
-        brightened_image.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        return self.send_image_data(img_byte_arr)
-    
     def check_right_button(self):
         return GPIO.input(self.right_button_pin) == GPIO.LOW
     
