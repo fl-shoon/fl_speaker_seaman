@@ -281,7 +281,8 @@ class SettingModule:
             while True:
                 action = self.check_buttons()
                 if action == 'back':
-                    pass
+                    logger.info("Returning to main app.")
+                    return 'exit', self.brightness
                 time.sleep(0.1)
         except KeyboardInterrupt:
             logger.error("\nProgram terminated by user")

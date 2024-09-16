@@ -139,11 +139,14 @@ class VoiceAssistant:
 
     def open_settings_menu(self):
         action, new_brightness = self.setting_module.run()
-        if action == 'confirm':
+        if action == 'back':
+            logger.info("Returned from settings menu")
+        elif action == 'exit':
+            logger.info("Exited from settings menu")
+        
+        if new_brightness != self.serial_module.current_brightness:
             self.serial_module.set_brightness(new_brightness)
             logger.info(f"Brightness updated to {new_brightness:.2f}")
-        else:
-            logger.info("Settings adjustment cancelled")
 
     def run(self):
         try:
