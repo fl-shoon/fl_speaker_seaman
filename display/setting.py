@@ -1,10 +1,10 @@
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
-from serialModule import SerialModule
-# from transmission.serialModule import SerialModule
-from brightness import BrightnessModule
+# from serialModule import SerialModule
+from transmission.serialModule import SerialModule
+# from brightness import BrightnessModule
 from volume import VolumeModule
-# from display.brightness import BrightnessModule
+from display.brightness import BrightnessModule
 
 import RPi.GPIO as GPIO 
 import time, io, math, logging, serial.tools.list_ports
