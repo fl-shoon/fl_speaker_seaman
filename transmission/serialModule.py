@@ -179,47 +179,47 @@ class SerialModule:
                 self.send_image_data(frame_bytes)
                 time.sleep(frame_delay)
 
-    # def set_current_image(self, image):
-    #     self.current_image = image
+    def set_current_image(self, image):
+        self.current_image = image
 
-    # def set_brightness_image(self, brightness, steps=10, transition_time=0.5):
-    #     if not self.isPortOpen or self.comm is None:
-    #         logger.error("Serial port is not open")
-    #         return False
+    def set_brightness_image(self, brightness, steps=10, transition_time=0.5):
+        if not self.isPortOpen or self.comm is None:
+            logger.error("Serial port is not open")
+            return False
 
-    #     if self.current_image is None:
-    #         logger.error("No current image to adjust brightness")
-    #         return False
+        if self.current_image is None:
+            logger.error("No current image to adjust brightness")
+            return False
 
-    #     start_brightness = self.current_brightness
-    #     brightness_step = (brightness - start_brightness) / steps
-    #     step_time = transition_time / steps
+        start_brightness = self.current_brightness
+        brightness_step = (brightness - start_brightness) / steps
+        step_time = transition_time / steps
 
-    #     for i in range(steps + 1):
-    #         current_step_brightness = start_brightness + brightness_step * i
-    #         try:
-    #             # Adjust image brightness
-    #             enhancer = ImageEnhance.Brightness(self.current_image)
-    #             adjusted_image = enhancer.enhance(current_step_brightness)
+        for i in range(steps + 1):
+            current_step_brightness = start_brightness + brightness_step * i
+            try:
+                # Adjust image brightness
+                enhancer = ImageEnhance.Brightness(self.current_image)
+                adjusted_image = enhancer.enhance(current_step_brightness)
 
-    #             # Convert to bytes
-    #             img_byte_arr = io.BytesIO()
-    #             adjusted_image.save(img_byte_arr, format='PNG')
-    #             img_byte_arr = img_byte_arr.getvalue()
+                # Convert to bytes
+                img_byte_arr = io.BytesIO()
+                adjusted_image.save(img_byte_arr, format='PNG')
+                img_byte_arr = img_byte_arr.getvalue()
 
-    #             # Send to display
-    #             self.send_image_data(img_byte_arr)
+                # Send to display
+                self.send_image_data(img_byte_arr)
                 
-    #             logger.debug(f"Adjusted brightness to {current_step_brightness:.2f}")
-    #             time.sleep(step_time)
+                logger.debug(f"Adjusted brightness to {current_step_brightness:.2f}")
+                time.sleep(step_time)
 
-    #         except Exception as e:
-    #             logger.error(f"Error adjusting brightness: {str(e)}")
-    #             return False
+            except Exception as e:
+                logger.error(f"Error adjusting brightness: {str(e)}")
+                return False
 
-    #     self.current_brightness = brightness
-    #     logger.info(f"Brightness adjustment completed. Final brightness: {brightness:.2f}")
-    #     return True
+        self.current_brightness = brightness
+        logger.info(f"Brightness adjustment completed. Final brightness: {brightness:.2f}")
+        return True
 
     def close(self):
         if self.isPortOpen and self.comm is not None:
