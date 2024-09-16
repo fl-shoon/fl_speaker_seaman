@@ -42,11 +42,12 @@ class DisplayModule:
             rgb_img = Image.new("RGB", faded_img.size, (0, 0, 0))
             rgb_img.paste(faded_img, mask=faded_img.split()[3])
 
-            img_byte_arr = io.BytesIO()
-            rgb_img.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
+            # img_byte_arr = io.BytesIO()
+            # rgb_img.save(img_byte_arr, format='PNG')
+            # img_byte_arr = img_byte_arr.getvalue()
 
-            self.serial_module.send_image_data(img_byte_arr)
+            # self.serial_module.send_image_data(img_byte_arr)
+            self.serial_module.send_image_data(rgb_img)
             time.sleep(0.01)
 
     def play_trigger_with_logo(self, trigger_audio, logo_path):
@@ -67,7 +68,8 @@ class DisplayModule:
         
         frame_index = 0
         while mixer.music.get_busy():
-            self.serial_module.send_image_data(all_frames[frame_index])
+            self.serial_module.send_image_data(Image.fromarray(frames[frame_index]))
+            # self.serial_module.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(frame_delay)
 
@@ -76,7 +78,8 @@ class DisplayModule:
         all_frames = self.serial_module.precompute_frames(frames)
         frame_index = 0
         while not stop_event.is_set():
-            self.serial_module.send_image_data(all_frames[frame_index])
+            self.serial_module.send_image_data(Image.fromarray(frames[frame_index]))
+            # self.serial_module.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
@@ -91,11 +94,12 @@ class DisplayModule:
             if (width, height) != (240, 240):
                 img = img.resize((240, 240))
 
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
+            # img_byte_arr = io.BytesIO()
+            # img.save(img_byte_arr, format='PNG')
+            # img_byte_arr = img_byte_arr.getvalue()
 
-            self.serial_module.send_image_data(img_byte_arr)
+            # self.serial_module.send_image_data(img_byte_arr)
+            self.serial_module.send_image_data(img)
 
         except Exception as e:
             logger.warning(f"Error in display_image: {e}")

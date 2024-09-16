@@ -85,6 +85,10 @@ class SerialModule:
         logger.warning("Failed to send image data after all retries")
         return False
 
+    def set_brightness(self, brightness):
+        self.current_brightness = brightness
+        logger.info(f"Brightness set to {self.current_brightness}")
+        
     def check_right_button(self):
         return GPIO.input(self.right_button_pin) == GPIO.LOW
     

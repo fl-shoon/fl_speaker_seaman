@@ -84,6 +84,8 @@ class VoiceAssistant:
                     logger.info("Right button pressed. Opening settings menu.")
                     self.open_settings_menu()
                     return False
+                
+                time.sleep(0.01)
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
         finally:

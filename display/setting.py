@@ -231,15 +231,7 @@ class SettingModule:
 
         self.current_menu_image = image
         
-        # Apply current brightness to the image
-        enhancer = ImageEnhance.Brightness(image)
-        brightened_image = enhancer.enhance(self.brightness)
-
-        # Convert to bytes and send to display
-        img_byte_arr = io.BytesIO()
-        brightened_image.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        self.serial_module.send_image_data(img_byte_arr)
+        self.serial_module.send_image_data(image)
 
     def check_buttons(self):
         if GPIO.input(self.buttons['up']) == GPIO.LOW:
