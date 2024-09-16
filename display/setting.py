@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 # from serialModule import SerialModule
 from transmission.serialModule import SerialModule
 # from brightness import BrightnessModule
-from volume import VolumeModule
+# from volume import VolumeModule
 from display.brightness import BrightnessModule
 
 import RPi.GPIO as GPIO 
@@ -58,7 +58,7 @@ class SettingModule:
         self.brightness_control = BrightnessModule(serial_module, self.brightness)
         self.current_menu_image = None
 
-        self.volume_control = VolumeModule(serial_module, self.brightness)
+        # self.volume_control = VolumeModule(serial_module, self.brightness)
 
     def load_font(self):
         font_paths = [
@@ -261,16 +261,16 @@ class SettingModule:
                 else:
                     logger.info("Brightness adjustment cancelled")
                 self.update_display()
-            elif self.selected_item == 0: # Volume control
-                self.serial_module.set_current_image(self.current_menu_image)  # Ensure current image is set
-                action, new_brightness = self.volume_control.run()
-                if action == 'confirm':
-                    self.brightness = new_brightness
-                    self.serial_module.set_brightness_image(self.brightness)
-                    logger.info(f"Volume updated to {self.brightness:.2f}")
-                else:
-                    logger.info("Volume adjustment cancelled")
-                self.update_display()
+            # elif self.selected_item == 0: # Volume control
+            #     self.serial_module.set_current_image(self.current_menu_image)  # Ensure current image is set
+            #     action, new_brightness = self.volume_control.run()
+            #     if action == 'confirm':
+            #         self.brightness = new_brightness
+            #         self.serial_module.set_brightness_image(self.brightness)
+            #         logger.info(f"Volume updated to {self.brightness:.2f}")
+            #     else:
+            #         logger.info("Volume adjustment cancelled")
+            #     self.update_display()
             time.sleep(0.2)
         elif GPIO.input(self.buttons['left']) == GPIO.LOW:
             return 'back'
