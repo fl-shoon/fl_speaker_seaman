@@ -10,7 +10,6 @@ from openAI.conversation import OpenAIModule
 from audio.player import sync_audio_and_gif, play_audio
 from audio.recorder import record_audio
 from display.show import DisplayModule
-from display.setting import SettingModule
 from etc.define import *
 from pvrecorder import PvRecorder
 from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
@@ -31,7 +30,6 @@ class VoiceAssistant:
         self.recorder = None
         self.vt = None
         self.ai_client = None
-        self.setting_module = None
 
     def initialize(self):
         try:
@@ -46,7 +44,6 @@ class VoiceAssistant:
             self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
             
             self.recorder = PvRecorder(frame_length=self.vt.frame_size)
-            self.setting_module = SettingModule(self.serial_module)
             
             logger.info("Voice Assistant initialized successfully")
         except Exception as e:
@@ -79,13 +76,6 @@ class VoiceAssistant:
                     logger.info(f"Wake word detected: {detected_keyword}")
                     play_audio(ResponseAudio)
                     return True
-                
-                if self.serial_module.check_right_button():
-                    logger.info("Right button pressed. Opening settings menu.")
-                    self.open_settings_menu()
-                    return False
-                
-                time.sleep(0.01)
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
         finally:
@@ -138,17 +128,6 @@ class VoiceAssistant:
                 conversation_active = False
 
         self.display.fade_in_logo(SeamanLogo)
-
-    def open_settings_menu(self):
-        action, new_brightness = self.setting_module.run()
-        if action == 'back':
-            logger.info("Returned from settings menu")
-        elif action == 'exit':
-            logger.info("Exited from settings menu")
-        
-        if new_brightness != self.serial_module.current_brightness:
-            self.serial_module.set_brightness(new_brightness)
-            logger.info(f"Brightness updated to {new_brightness:.2f}")
 
     def run(self):
         try:
