@@ -7,3 +7,6 @@ rx
 pillow
 numpy
 firebase-admin
+fastapi
+aiohttp
+uvicorn
