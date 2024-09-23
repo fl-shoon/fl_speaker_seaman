@@ -10,7 +10,7 @@ SIM7600X 4G DONGLE
 4G Nano SIM カード (カードは動作可能で、4G にアクセスできる必要があります)
 
 ## Raspberry Pi (Raspbian) の 4G 接続を設定する
-<img src="assets/DONGLE-to-RPi.jpg", style="width:500px">
+<img src="assets/dongle_rpi.jpg", style="width:500px">
 
 ## 1. まずポートを開く
 以下のコマンドを実行してttyUSB2が正常に認識されるかどうかを確認し、正常に認識された場合はminicom経由でポートを開きます。
