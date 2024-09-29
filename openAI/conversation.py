@@ -15,9 +15,9 @@ class OpenAIModule:
 
     def generate_text(self, prompt: str) -> str:
         response = self.client.completions.create(
-            model="gpt-3.5-turbo-instruct",  
+            model="gpt-4",  
             prompt=prompt,
-            max_tokens=100,
+            max_tokens=500,
             temperature=0.75,
         )
         return response.choices[0].text.strip()

@@ -140,4 +140,4 @@ class InteractiveRecorder:
 
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=1)
-    return recorder.record_question(silence_threshold=0.0005, silence_duration=1.5, max_duration=15)
+    return recorder.record_question(silence_threshold=1, silence_duration=1, max_duration=10)

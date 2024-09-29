@@ -37,6 +37,7 @@ class VoiceAssistant:
             self.display = DisplayModule(self.serial_module)
             
             if not self.serial_module.open(USBPort):
+                # FIXME: Send a failure notice post request to server later
                 raise ConnectionError(f"Failed to open serial port {USBPort}")
 
             self.ai_client = OpenAIModule()
@@ -47,6 +48,7 @@ class VoiceAssistant:
             
             logger.info("Voice Assistant initialized successfully")
         except Exception as e:
+            # FIXME: Send a failure notice post request to server later
             logger.error(f"Initialization error: {e}")
             self.cleanup()
             raise
@@ -61,6 +63,7 @@ class VoiceAssistant:
                 logger.info(f"Attempt {attempt + 1} failed. Retrying in 1 second...")
                 time.sleep(1)
             logger.error("Failed to reopen serial connection after 3 attempts.")
+            # FIXME: Send a failure notice post request to server later
             return False
         return True
 
@@ -72,11 +75,19 @@ class VoiceAssistant:
                 audio_data = np.array(audio_frame, dtype=np.int16)
                 detections = self.vt.process(audio_data)
                 if any(detections):
-                    detected_keyword = detections.index(max(detections))
-                    logger.info(f"Wake word detected: {detected_keyword}")
+                    '''
+                    All in one operation to both detect 
+                    if a wake word was spoken and 
+                    determine which specific wake word it was
+                    
+                    # detected_keyword = detections.index(max(detections))
+                    # logger.info(f"Wake word detected: {detected_keyword}")
+                    '''
+                    logger.info("Wake word detected")
                     play_audio(ResponseAudio)
                     return True
         except Exception as e:
+            # FIXME: Handle the error and try to process wake word again
             logger.error(f"Error in wake word detection: {e}")
         finally:
             self.recorder.stop()
@@ -157,10 +168,24 @@ class VoiceAssistant:
         logger.info("Cleanup process completed.")
 
 def signal_handler(signum, frame):
-    logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
+    # Handle the signals when either signal is received
+    logger.info(f"Received {signum} signal. Initiating graceful shutdown...")
     exit_event.set()
 
 if __name__ == '__main__':
+    '''
+    Set up a handler for a specific signal
+    signal.signal(params1, params2)
+
+    params1 : the signal number
+    params2 : the function to be called when the signal is received
+
+    SIGTERM(Signal Terminate) 
+    The standard signal for requesting a program to terminate
+
+    SIGINT (Signal Interrupt)
+    Typically sent when the user presses Ctrl+C
+    '''
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
 
