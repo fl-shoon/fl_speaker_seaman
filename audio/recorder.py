@@ -80,6 +80,7 @@ class InteractiveRecorder:
         energy_window = deque(maxlen=self.ENERGY_WINDOW)
         max_energy = 0
         dynamic_silence_threshold = initial_silence_threshold
+        last_speech_chunk = 0
 
         while True:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -102,6 +103,7 @@ class InteractiveRecorder:
 
             if is_speech or volume > dynamic_silence_threshold:
                 speech_chunks += 1
+                last_speech_chunk = total_chunks
                 if speech_chunks >= self.SPEECH_CHUNKS and not start_recording:
                     start_recording = True
                     frames = list(buffer_queue) + frames
@@ -111,13 +113,15 @@ class InteractiveRecorder:
 
             if start_recording:
                 avg_energy = sum(energy_window) / len(energy_window)
-                recent_energy = sum(list(energy_window)[-10:]) / 10  
+                recent_energy = sum(list(energy_window)[-5:]) / 5  # Use last 50ms for recent energy
 
                 # Detect end of speech
                 if recent_energy < dynamic_silence_threshold and avg_energy < energy_threshold * max_energy:
-                    pause_duration = sum(1 for v in reversed(energy_window) if v < dynamic_silence_threshold)
-                    if pause_duration >= self.PAUSE_WINDOW * 0.7:  
+                    silence_duration = total_chunks - last_speech_chunk
+                    if silence_duration >= self.PAUSE_WINDOW:
                         logger.info("End of speech detected")
+                        # Trim the end to remove silence
+                        frames = frames[:-(silence_duration - self.PAUSE_WINDOW // 2)]
                         break
 
             if total_chunks > max_duration * 1000 / self.CHUNK_DURATION_MS:
