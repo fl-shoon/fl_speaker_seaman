@@ -16,9 +16,9 @@ class InteractiveRecorder:
         self.CHUNK_DURATION_MS = 10
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
         self.SPEECH_CHUNKS = int(0.1 * 1000 / self.CHUNK_DURATION_MS)
-        self.SHORT_SILENCE_CHUNKS = int(0.3 * 1000 / self.CHUNK_DURATION_MS)
-        self.LONG_SILENCE_CHUNKS = int(1.0 * 1000 / self.CHUNK_DURATION_MS)
-        self.ACTIVITY_WINDOW = int(2.0 * 1000 / self.CHUNK_DURATION_MS)
+        self.SHORT_SILENCE_CHUNKS = int(0.2 * 1000 / self.CHUNK_DURATION_MS)
+        self.LONG_SILENCE_CHUNKS = int(0.5 * 1000 / self.CHUNK_DURATION_MS)
+        self.SHORT_SPEECH_DURATION = int(1.5 * 1000 / self.CHUNK_DURATION_MS)  # 1.5 seconds
 
     def start_stream(self):
         self.stream = self.audio.open(format=pyaudio.paInt16,
@@ -45,7 +45,7 @@ class InteractiveRecorder:
         total_chunks = 0
         start_recording = False
         buffer_queue = deque(maxlen=self.SHORT_SILENCE_CHUNKS)
-        activity_window = deque(maxlen=self.ACTIVITY_WINDOW)
+        speech_energy = 0
 
         while True:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -57,30 +57,33 @@ class InteractiveRecorder:
             audio_chunk = np.frombuffer(data, dtype=np.int16)
             volume = np.abs(audio_chunk).mean() / 32767
 
-            activity_window.append(volume > short_silence_threshold)
-
             if is_speech or volume > short_silence_threshold:
                 speech_chunks += 1
                 silent_chunks = 0
+                speech_energy += volume
                 if speech_chunks >= self.SPEECH_CHUNKS and not start_recording:
                     start_recording = True
                     frames = list(buffer_queue) + frames
                     logger.info("Speech detected, started recording")
             else:
                 silent_chunks += 1
-                speech_chunks = 0
+                speech_chunks = max(0, speech_chunks - 1)  # Allow for small interruptions
 
             if start_recording:
-                if silent_chunks >= self.LONG_SILENCE_CHUNKS or volume < long_silence_threshold:
-                    logger.info("Long silence detected, stopping recording")
-                    break
-                elif silent_chunks >= self.SHORT_SILENCE_CHUNKS and volume < short_silence_threshold:
-                    logger.info("Short silence detected, stopping recording")
-                    break
+                # For short speech, be more sensitive to silence
+                if total_chunks <= self.SHORT_SPEECH_DURATION:
+                    if silent_chunks >= self.SHORT_SILENCE_CHUNKS:
+                        logger.info("End of short speech detected")
+                        break
+                else:
+                    if silent_chunks >= self.LONG_SILENCE_CHUNKS or volume < long_silence_threshold:
+                        logger.info("Long silence detected, stopping recording")
+                        break
                 
-                # Check for low activity over the past 2 seconds
-                if len(activity_window) == self.ACTIVITY_WINDOW and sum(activity_window) / len(activity_window) < 0.1:
-                    logger.info("Low activity detected, stopping recording")
+                # Check for sustained low energy
+                avg_energy = speech_energy / total_chunks if total_chunks > 0 else 0
+                if total_chunks > self.SHORT_SPEECH_DURATION and volume < avg_energy / 2:
+                    logger.info("Sustained low energy detected, stopping recording")
                     break
 
             if total_chunks > max_duration * 1000 / self.CHUNK_DURATION_MS:
