@@ -3,9 +3,7 @@ import numpy as np
 import logging
 import webrtcvad 
 from collections import deque
-# from etc.define import *
-CHANNELS = 1
-RATE = 16000
+from etc.define import *
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -96,13 +94,6 @@ def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=3)
     return recorder.record_question(short_silence_threshold=0.015, long_silence_threshold=0.01, max_duration=10)
 
-if __name__ == "__main__":
-    print("Testing speech detection. Speak into your microphone...")
-    audio_data = record_audio()
-    if audio_data:
-        print(f"Recorded audio data of length: {len(audio_data)} bytes")
-    else:
-        print("No speech detected")
 # import pyaudio, os
 # import numpy as np
 # import logging
