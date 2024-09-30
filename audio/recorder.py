@@ -4,14 +4,38 @@ import logging
 import webrtcvad 
 from collections import deque
 from etc.define import *
+from contextlib import contextmanager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@contextmanager
+def suppress_stdout_stderr():
+    """A context manager that redirects stdout and stderr to devnull"""
+    try:
+        null = os.open(os.devnull, os.O_RDWR)
+        save_stdout, save_stderr = os.dup(1), os.dup(2)
+        os.dup2(null, 1)
+        os.dup2(null, 2)
+        yield
+    finally:
+        os.dup2(save_stdout, 1)
+        os.dup2(save_stderr, 2)
+        os.close(null)
+
+ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Error: {reason}")
+ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
+
 class InteractiveRecorder:
     def __init__(self, vad_aggressiveness=3):
+        '''
+        VAD aggressiveness
+        Increasing the value => less sensitive to background noise
+        But, it can lead to less speech detection performance.
+
+        Decreasing the vlaue => more sensitive to potential speech
+        '''
         self.vad = webrtcvad.Vad(vad_aggressiveness)
-        self.audio = pyaudio.PyAudio()
         self.stream = None
         self.CHUNK_DURATION_MS = 10
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
@@ -19,8 +43,18 @@ class InteractiveRecorder:
         self.PAUSE_WINDOW = int(1.0 * 1000 / self.CHUNK_DURATION_MS)
         self.ENERGY_WINDOW = int(2.0 * 1000 / self.CHUNK_DURATION_MS)
 
+        with suppress_stdout_stderr():
+            self.audio = pyaudio.PyAudio()
+
+        try:
+            asound = self.p._lib_pa.pa_get_library_by_name('libasound.so.2')
+            asound.snd_lib_error_set_handler(ERROR_HANDLER_FUNC_PTR)
+        except:
+            logger.warning("Failed to set ALSA error handler")
+
     def start_stream(self):
-        self.stream = self.audio.open(format=pyaudio.paInt16,
+        with suppress_stdout_stderr():
+            self.stream = self.audio.open(format=pyaudio.paInt16,
                                       channels=CHANNELS,
                                       rate=RATE,
                                       input=True,
@@ -56,6 +90,10 @@ class InteractiveRecorder:
             is_speech = self.is_speech(data)
             audio_chunk = np.frombuffer(data, dtype=np.int16)
             volume = np.abs(audio_chunk).mean() / 32767
+            '''
+            32767 is the maximum positive value for a 16-bit signed integer
+            calculates the average absolute amplitude of the audio chunk, normalized to a 0-1 range
+            ''' 
             energy_window.append(volume)
 
             if volume > max_energy:
