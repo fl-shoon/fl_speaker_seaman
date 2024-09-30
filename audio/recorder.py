@@ -64,22 +64,18 @@ class InteractiveRecorder:
             self.stream.close()
         self.p.terminate()
 
-    def record_question(self, silence_threshold=0.02, silence_duration=1.0, max_duration=15):
+    def record_question(self, silence_threshold=0.015, silence_duration=0.5, max_duration=10):
         self.start_stream()
-        logger.info("Listening... Speak your question.")
 
         frames = []
         silent_frames = 0
         is_speaking = False
         speech_frames = 0
         total_frames = 0
-        average_audio_level = 0
-        alpha = 0.1
-        trailing_silence = 0
-        trailing_silence_threshold = 5
         
-        consecutive_speech_frames = 2
-        initial_silence_duration = 10
+        consecutive_speech_frames = 3
+        initial_silence_duration = 3
+
         max_silent_frames = int(silence_duration * RATE / self.CHUNK_SIZE)
 
         while True:
@@ -89,38 +85,27 @@ class InteractiveRecorder:
 
             audio_chunk = np.frombuffer(data, dtype=np.int16)
             audio_level = np.abs(audio_chunk).mean() / 32767
-            average_audio_level = alpha * audio_level + (1 - alpha) * average_audio_level
 
-            try:
-                is_speech = self.vad.is_speech(data, RATE)
-            except Exception as e:
-                logger.error(f"VAD error: {e}")
-                is_speech = False
+            is_speech = self.vad.is_speech(data, RATE)
 
-            if is_speech or average_audio_level > silence_threshold:
+            if is_speech or audio_level > silence_threshold:
                 speech_frames += 1
-                silent_frames = max(0, silent_frames - 1)
-                if not is_speaking and speech_frames > consecutive_speech_frames:
+                silent_frames = 0
+                if not is_speaking and speech_frames >= consecutive_speech_frames:
                     logger.info("Speech detected. Recording...")
                     is_speaking = True
             else:
                 silent_frames += 1
-                speech_frames = max(0, speech_frames - 1)
+                speech_frames = 0
 
             if is_speaking:
-                if silent_frames > max_silent_frames:
-                    trailing_silence += 1
-                    if trailing_silence > trailing_silence_threshold:
-                        logger.info(f"End of speech detected. Total frames: {total_frames}")
-                        break
-                else:
-                    trailing_silence = 0
+                if silent_frames >= max_silent_frames:
+                    logger.info(f"End of speech detected. Total frames: {total_frames}")
+                    break
             elif total_frames > initial_silence_duration * RATE / self.CHUNK_SIZE:
                 logger.info("No speech detected. Stopping recording.")
                 return None
 
-            logger.debug(f"Frame {total_frames}: Audio level: {audio_level:.4f}, Avg level: {average_audio_level:.4f}, Is speech: {is_speech}")
-            
             if total_frames > max_duration * RATE / self.CHUNK_SIZE:
                 logger.info(f"Maximum duration reached. Total frames: {total_frames}")
                 break
@@ -201,5 +186,5 @@ class InteractiveRecorder:
     #     return b''.join(frames)  
 
 def record_audio():
-    recorder = InteractiveRecorder(vad_aggressiveness=3)
-    return recorder.record_question(silence_threshold=0.01, silence_duration=0.8, max_duration=10)
+    recorder = InteractiveRecorder(vad_aggressiveness=2)
+    return recorder.record_question(silence_threshold=0.015, silence_duration=0.5, max_duration=10)
