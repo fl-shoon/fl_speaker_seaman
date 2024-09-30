@@ -64,7 +64,7 @@ class InteractiveRecorder:
             self.stream.close()
         self.p.terminate()
 
-    def record_question(self, silence_threshold=0.0005, silence_duration=1.5, max_duration=15):
+    def record_question(self, silence_threshold, silence_duration, max_duration):
         '''
         Silence_threadshold is so low because mic's audio output levels were generally very low.
         Setting the small value enhances the detection of quieter speech.
@@ -139,5 +139,5 @@ class InteractiveRecorder:
         return b''.join(frames)  
 
 def record_audio():
-    recorder = InteractiveRecorder(vad_aggressiveness=2)
-    return recorder.record_question(silence_threshold=0.02, silence_duration=1, max_duration=10)
+    recorder = InteractiveRecorder(vad_aggressiveness=3)
+    return recorder.record_question(silence_threshold=0.01, silence_duration=1, max_duration=10)
