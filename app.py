@@ -3,7 +3,6 @@ import logging
 import signal
 import wave
 import time
-import asyncio
 import numpy as np
 from threading import Event
 
