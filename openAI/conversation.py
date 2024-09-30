@@ -1,35 +1,29 @@
-import os, logging, time, wave
+import os, logging, time, wave, asyncio
 import numpy as np
 from typing import List, Dict
-from openai import OpenAI, OpenAIError
+from openai import AsyncOpenAI, OpenAIError
 from etc.define import ErrorAudio
 
 logging.basicConfig(level=logging.INFO)
 
 class OpenAIModule:
     def __init__(self):
-        self.client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        self.client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
         self.conversation_history: List[Dict[str, str]] = []
         self.max_retries = 3
-        self.retry_delay = 5 
+        self.retry_delay = 5
+        self.tts_cache = {}
 
-    def generate_text(self, prompt: str) -> str:
-        response = self.client.completions.create(
-            model="gpt-4",  
+    async def generate_text(self, prompt: str) -> str:
+        response = await self.client.completions.create(
+            model="gpt-4",
             prompt=prompt,
             max_tokens=500,
             temperature=0.75,
         )
         return response.choices[0].text.strip()
 
-    def embed_content(self, text: str) -> List[float]:
-        response = self.client.embeddings.create(
-            input=text,
-            model="text-embedding-ada-002"
-        )
-        return response.data[0].embedding
-
-    def chat(self, new_message: str) -> str:
+    async def chat(self, new_message: str) -> str:
         for attempt in range(self.max_retries):
             try:
                 if not self.conversation_history:
@@ -42,7 +36,7 @@ class OpenAIModule:
 
                 self.conversation_history.append({"role": "user", "content": new_message})
 
-                response = self.client.chat.completions.create(
+                response = await self.client.chat.completions.create(
                     model="gpt-4",
                     messages=self.conversation_history,
                     temperature=0.75,
@@ -51,86 +45,66 @@ class OpenAIModule:
                 ai_message = response.choices[0].message.content
                 self.conversation_history.append({"role": "assistant", "content": ai_message})
 
-                # Limit conversation history to last 10 messages to prevent token limit issues
-                if len(self.conversation_history) > 11:  # 11 to keep the system message
+                if len(self.conversation_history) > 11:
                     self.conversation_history = self.conversation_history[:1] + self.conversation_history[-10:]
 
                 return ai_message
             except OpenAIError as e:
-                if e.code == 'insufficient_quota':
-                    logging.error("OpenAI API quota exceeded. Please check your plan and billing details.")
-                    return "申し訳ありません。現在システムに問題が発生しています。後でもう一度お試しください。"
-                elif e.code == 'rate_limit_exceeded':
-                    if attempt < self.max_retries - 1:
-                        logging.warning(f"Rate limit exceeded. Retrying in {self.retry_delay} seconds...")
-                        time.sleep(self.retry_delay)
-                    else:
-                        logging.error("Max retries reached. Unable to complete the request.")
-                        return "申し訳ありません。しばらくしてからもう一度お試しください。"
+                if attempt < self.max_retries - 1:
+                    logging.warning(f"OpenAI API error: {e}. Retrying in {self.retry_delay} seconds...")
+                    await asyncio.sleep(self.retry_delay)
                 else:
-                    logging.error(f"OpenAI API error: {e}")
-                    return "申し訳ありません。エラーが発生しました。"
+                    return self.handle_openai_error(e)
 
-    def transcribe_audio(self, audio_file_path: str) -> str:
+    async def transcribe_audio(self, audio_file_path: str) -> str:
         with open(audio_file_path, "rb") as audio_file:
-            transcript = self.client.audio.transcriptions.create(
-                model="whisper-1", 
-                file=audio_file, 
+            transcript = await self.client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
                 response_format="text",
                 language="ja"
             )
         return transcript
 
-    def text_to_speech(self, text: str, output_file: str):
+    async def text_to_speech(self, text: str, output_file: str):
+        if text in self.tts_cache:
+            with open(output_file, "wb") as f:
+                f.write(self.tts_cache[text])
+            return
+
         try:
-            response = self.client.audio.speech.create(
+            response = await self.client.audio.speech.create(
                 model="tts-1-hd",
                 voice="nova",
                 input=text,
                 response_format="wav",
             )
 
+            audio_data = await response.read()
             with open(output_file, "wb") as f:
-                for chunk in response.iter_bytes(chunk_size=4096):
-                    f.write(chunk)
+                f.write(audio_data)
+
+            self.tts_cache[text] = audio_data
         except OpenAIError as e:
             logging.error(f"Failed to generate speech: {e}")
-            self.fallback_text_to_speech(text, output_file)
+            await self.fallback_text_to_speech(text, output_file)
 
-    def reset_conversation(self):
-        self.conversation_history = [
-            {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
-            ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
-            会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
-            ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
-        ]
-
-    def get_last_user_message(self):
-        for message in reversed(self.conversation_history):
-            if message["role"] == "user":
-                return message["content"]
-        return ""
-
-    def process_audio(self, input_audio_file: str) -> tuple[str, bool]:
+    async def process_audio(self, input_audio_file: str) -> tuple[str, bool]:
         try:
-            # Generate output filename
             base, ext = os.path.splitext(input_audio_file)
             output_audio_file = f"{base}_response{ext}"
 
-            # Speech-to-Text
-            stt_text = self.transcribe_audio(input_audio_file)
+            stt_text = await self.transcribe_audio(input_audio_file)
             logging.info(f"Transcript: {stt_text}")
 
-            # Generate content using OpenAI
-            content_response = self.chat(stt_text)
+            content_response = await self.chat(stt_text)
             conversation_ended = '[END_OF_CONVERSATION]' in content_response
             content_response = content_response.replace('[END_OF_CONVERSATION]', '').strip()
 
             logging.info(f"AI response: {content_response}")
             logging.info(f"Conversation ended: {conversation_ended}")
 
-            # Text-to-Speech
-            self.text_to_speech(content_response, output_audio_file)
+            await self.text_to_speech(content_response, output_audio_file)
             logging.info(f'Audio content written to file "{output_audio_file}"')
 
             return output_audio_file, conversation_ended
@@ -138,7 +112,7 @@ class OpenAIModule:
         except OpenAIError as e:
             error_message = self.handle_openai_error(e)
             output_audio_file = ErrorAudio
-            self.text_to_speech(error_message, output_audio_file)
+            await self.text_to_speech(error_message, output_audio_file)
             return output_audio_file, True
 
     def handle_openai_error(self, e: OpenAIError) -> str:
