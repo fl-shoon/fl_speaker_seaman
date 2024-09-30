@@ -15,11 +15,12 @@ class InteractiveRecorder:
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.audio = pyaudio.PyAudio()
         self.stream = None
-        self.CHUNK_DURATION_MS = 10  # Even smaller chunks for faster response
+        self.CHUNK_DURATION_MS = 10
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
-        self.SPEECH_CHUNKS = int(0.1 * 1000 / self.CHUNK_DURATION_MS)  # 0.1 sec of speech to start
-        self.SHORT_SILENCE_CHUNKS = int(0.2 * 1000 / self.CHUNK_DURATION_MS)  # 0.2 sec of short silence
-        self.LONG_SILENCE_CHUNKS = int(0.5 * 1000 / self.CHUNK_DURATION_MS)  # 0.5 sec of long silence
+        self.SPEECH_CHUNKS = int(0.1 * 1000 / self.CHUNK_DURATION_MS)
+        self.SHORT_SILENCE_CHUNKS = int(0.3 * 1000 / self.CHUNK_DURATION_MS)
+        self.LONG_SILENCE_CHUNKS = int(1.0 * 1000 / self.CHUNK_DURATION_MS)
+        self.ACTIVITY_WINDOW = int(2.0 * 1000 / self.CHUNK_DURATION_MS)
 
     def start_stream(self):
         self.stream = self.audio.open(format=pyaudio.paInt16,
@@ -46,6 +47,7 @@ class InteractiveRecorder:
         total_chunks = 0
         start_recording = False
         buffer_queue = deque(maxlen=self.SHORT_SILENCE_CHUNKS)
+        activity_window = deque(maxlen=self.ACTIVITY_WINDOW)
 
         while True:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -56,6 +58,8 @@ class InteractiveRecorder:
             is_speech = self.is_speech(data)
             audio_chunk = np.frombuffer(data, dtype=np.int16)
             volume = np.abs(audio_chunk).mean() / 32767
+
+            activity_window.append(volume > short_silence_threshold)
 
             if is_speech or volume > short_silence_threshold:
                 speech_chunks += 1
@@ -74,6 +78,11 @@ class InteractiveRecorder:
                     break
                 elif silent_chunks >= self.SHORT_SILENCE_CHUNKS and volume < short_silence_threshold:
                     logger.info("Short silence detected, stopping recording")
+                    break
+                
+                # Check for low activity over the past 2 seconds
+                if len(activity_window) == self.ACTIVITY_WINDOW and sum(activity_window) / len(activity_window) < 0.1:
+                    logger.info("Low activity detected, stopping recording")
                     break
 
             if total_chunks > max_duration * 1000 / self.CHUNK_DURATION_MS:
