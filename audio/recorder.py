@@ -47,7 +47,7 @@ class InteractiveRecorder:
             self.audio = pyaudio.PyAudio()
 
         try:
-            asound = self.p._lib_pa.pa_get_library_by_name('libasound.so.2')
+            asound = self.audio._lib_pa.pa_get_library_by_name('libasound.so.2')
             asound.snd_lib_error_set_handler(ERROR_HANDLER_FUNC_PTR)
         except:
             logger.warning("Failed to set ALSA error handler")
@@ -81,8 +81,12 @@ class InteractiveRecorder:
         max_energy = 0
         dynamic_silence_threshold = initial_silence_threshold
         last_speech_chunk = 0
+        silence_counter = 0
+        speech_detected = False
 
-        while True:
+        max_chunks = int(max_duration * 1000 / self.CHUNK_DURATION_MS)
+
+        while total_chunks < max_chunks:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
             frames.append(data)
             buffer_queue.append(data)
@@ -91,10 +95,6 @@ class InteractiveRecorder:
             is_speech = self.is_speech(data)
             audio_chunk = np.frombuffer(data, dtype=np.int16)
             volume = np.abs(audio_chunk).mean() / 32767
-            '''
-            32767 is the maximum positive value for a 16-bit signed integer
-            calculates the average absolute amplitude of the audio chunk, normalized to a 0-1 range
-            ''' 
             energy_window.append(volume)
 
             if volume > max_energy:
@@ -104,32 +104,39 @@ class InteractiveRecorder:
             if is_speech or volume > dynamic_silence_threshold:
                 speech_chunks += 1
                 last_speech_chunk = total_chunks
+                silence_counter = 0
                 if speech_chunks >= self.SPEECH_CHUNKS and not start_recording:
                     start_recording = True
+                    speech_detected = True
                     frames = list(buffer_queue) + frames
                     logger.info("Speech detected, started recording")
             else:
-                speech_chunks = max(0, speech_chunks - 1) 
+                silence_counter += 1
+                speech_chunks = max(0, speech_chunks - 1)
 
             if start_recording:
                 avg_energy = sum(energy_window) / len(energy_window)
-                recent_energy = sum(list(energy_window)[-5:]) / 5  # Use last 50ms for recent energy
+                recent_energy = sum(list(energy_window)[-10:]) / 10
 
-                # Detect end of speech
                 if recent_energy < dynamic_silence_threshold and avg_energy < energy_threshold * max_energy:
-                    silence_duration = total_chunks - last_speech_chunk
-                    if silence_duration >= self.PAUSE_WINDOW:
+                    if silence_counter >= self.PAUSE_WINDOW:
                         logger.info("End of speech detected")
-                        # Trim the end to remove silence
-                        frames = frames[:-(silence_duration - self.PAUSE_WINDOW // 2)]
+                        frames = frames[:-(silence_counter - self.PAUSE_WINDOW // 2)]
                         break
 
-            if total_chunks > max_duration * 1000 / self.CHUNK_DURATION_MS:
-                logger.info("Maximum duration reached")
-                break
+            if not speech_detected and total_chunks > max_chunks * 0.8:
+                logger.info("No speech detected, stopping recording")
+                return None
 
         self.stop_stream()
+        if total_chunks >= max_chunks:
+            logger.info("Maximum duration reached")
+            silence_threshold = max(initial_silence_threshold, max_energy * 0.05)
+            while frames and np.abs(np.frombuffer(frames[-1], dtype=np.int16)).mean() / 32767 < silence_threshold:
+                frames.pop()
+
         return b''.join(frames) if frames else None
+
 
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=3)
