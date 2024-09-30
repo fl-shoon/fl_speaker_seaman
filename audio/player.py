@@ -29,6 +29,7 @@ def play_audio(filename):
     with suppress_stdout_stderr():
         mixer.music.load(filename)
         mixer.music.play()
+        mixer.music.set_volume(0.2)
 
 def sync_audio_and_gif(display, audio_file, gif_path):
     play_audio(audio_file)
