@@ -15,11 +15,11 @@ class InteractiveRecorder:
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.audio = pyaudio.PyAudio()
         self.stream = None
-        self.CHUNK_DURATION_MS = 20  # Reduced for faster response
+        self.CHUNK_DURATION_MS = 10  # Even smaller chunks for faster response
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
-        self.SILENT_CHUNKS = int(0.3 * 1000 / self.CHUNK_DURATION_MS)  # 0.3 sec of silence
-        self.SPEECH_CHUNKS = int(0.1 * 1000 / self.CHUNK_DURATION_MS)  # 0.1 sec of speech
-        self.MAX_SILENCE_AFTER_SPEECH = int(1 * 1000 / self.CHUNK_DURATION_MS)  # 1 sec max silence after speech
+        self.SPEECH_CHUNKS = int(0.1 * 1000 / self.CHUNK_DURATION_MS)  # 0.1 sec of speech to start
+        self.SHORT_SILENCE_CHUNKS = int(0.2 * 1000 / self.CHUNK_DURATION_MS)  # 0.2 sec of short silence
+        self.LONG_SILENCE_CHUNKS = int(0.5 * 1000 / self.CHUNK_DURATION_MS)  # 0.5 sec of long silence
 
     def start_stream(self):
         self.stream = self.audio.open(format=pyaudio.paInt16,
@@ -37,7 +37,7 @@ class InteractiveRecorder:
     def is_speech(self, data):
         return self.vad.is_speech(data, RATE)
 
-    def record_question(self, silence_threshold=0.015, max_duration=10):
+    def record_question(self, short_silence_threshold=0.015, long_silence_threshold=0.01, max_duration=10):
         self.start_stream()
 
         frames = []
@@ -45,8 +45,7 @@ class InteractiveRecorder:
         speech_chunks = 0
         total_chunks = 0
         start_recording = False
-        buffer_queue = deque(maxlen=self.SILENT_CHUNKS)
-        silence_after_speech = 0
+        buffer_queue = deque(maxlen=self.SHORT_SILENCE_CHUNKS)
 
         while True:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -58,10 +57,9 @@ class InteractiveRecorder:
             audio_chunk = np.frombuffer(data, dtype=np.int16)
             volume = np.abs(audio_chunk).mean() / 32767
 
-            if is_speech or volume > silence_threshold:
+            if is_speech or volume > short_silence_threshold:
                 speech_chunks += 1
                 silent_chunks = 0
-                silence_after_speech = 0
                 if speech_chunks >= self.SPEECH_CHUNKS and not start_recording:
                     start_recording = True
                     frames = list(buffer_queue) + frames
@@ -69,12 +67,14 @@ class InteractiveRecorder:
             else:
                 silent_chunks += 1
                 speech_chunks = 0
-                if start_recording:
-                    silence_after_speech += 1
 
-            if start_recording and (silent_chunks >= self.SILENT_CHUNKS or silence_after_speech >= self.MAX_SILENCE_AFTER_SPEECH):
-                logger.info("End of speech detected")
-                break
+            if start_recording:
+                if silent_chunks >= self.LONG_SILENCE_CHUNKS or volume < long_silence_threshold:
+                    logger.info("Long silence detected, stopping recording")
+                    break
+                elif silent_chunks >= self.SHORT_SILENCE_CHUNKS and volume < short_silence_threshold:
+                    logger.info("Short silence detected, stopping recording")
+                    break
 
             if total_chunks > max_duration * 1000 / self.CHUNK_DURATION_MS:
                 logger.info("Maximum duration reached")
@@ -85,7 +85,7 @@ class InteractiveRecorder:
 
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=3)
-    return recorder.record_question(silence_threshold=0.015, max_duration=10)
+    return recorder.record_question(short_silence_threshold=0.015, long_silence_threshold=0.01, max_duration=10)
 
 if __name__ == "__main__":
     print("Testing speech detection. Speak into your microphone...")
