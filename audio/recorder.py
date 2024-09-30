@@ -89,7 +89,7 @@ class InteractiveRecorder:
         '''
         Initial silence duration to decide to stop recording due to no speech
         '''
-        initial_silence_duration = 10
+        initial_silence_duration = 5
 
         max_silent_frames = int(silence_duration * RATE / self.CHUNK_SIZE) # calculates how many silent chunks correspond to the silence_duration
 
@@ -140,4 +140,4 @@ class InteractiveRecorder:
 
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=3)
-    return recorder.record_question(silence_threshold=0.01, silence_duration=1, max_duration=10)
+    return recorder.record_question(silence_threshold=0.01, silence_duration=0.8, max_duration=10)
