@@ -1,12 +1,12 @@
-import RPi.GPIO as GPIO 
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-import io, time, math, logging
+import io, time, math, logging, json
 
 logging.basicConfig(level=logging.INFO)
 
 class BrightnessModule:
-    def __init__(self, serial_module, initial_brightness=0.5):
+    def __init__(self, serial_module, mcu_module, initial_brightness=0.5):
         self.serial_module = serial_module
+        self.input_serial = mcu_module
         self.background_color = (73, 80, 87)
         self.text_color = (255, 255, 255)
         self.highlight_color = (0, 119, 255)
@@ -14,16 +14,6 @@ class BrightnessModule:
         self.initial_brightness = initial_brightness
         self.current_brightness = initial_brightness
         self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
-
-        self.buttons = {
-            'up': 4,
-            'down': 17,
-            'left': 27,
-            'right': 22
-        }
-        for pin in self.buttons.values():
-            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
         self.font = self.load_font()
 
     def load_font(self):
@@ -142,21 +132,47 @@ class BrightnessModule:
                 y2 = y + center + int(size*0.42 * math.sin(math.radians(angle)))
                 draw.line([x1, y1, x2, y2], fill=self.text_color, width=2)
 
+    def command(self, method, params=None, serial_connection=None):
+        if serial_connection is None:
+            serial_connection = self.input_serial  
+        
+        message = {"method": method}
+        if params:
+            message["params"] = params
+        
+        serial_connection.write(json.dumps(message).encode() + b'\n')
+        response = serial_connection.readline().decode().strip()
+        
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            logging.error(f"Failed to parse response: {response}")
+            return None
+
+    def get_inputs(self):
+        return self.command("getInputs", serial_connection=self.input_serial)
+    
     def check_buttons(self):
-        if GPIO.input(self.buttons['up']) == GPIO.LOW:
-            self.current_brightness = min(1.0, self.current_brightness + 0.05)
-            self.update_display()
-            time.sleep(0.2)
-            return 'adjust'
-        elif GPIO.input(self.buttons['down']) == GPIO.LOW:
-            self.current_brightness = max(0.0, self.current_brightness - 0.05)
-            self.update_display()
-            time.sleep(0.2)
-            return 'adjust'
-        elif GPIO.input(self.buttons['left']) == GPIO.LOW:
-            return 'back'
-        elif GPIO.input(self.buttons['right']) == GPIO.LOW:
-            return 'confirm'
+        input_data = self.get_inputs()
+        if input_data and 'result' in input_data:
+            result = input_data['result']
+            buttons = result['buttons']
+
+            if buttons[3]:  # UP button
+                self.current_brightness = min(1.0, self.current_brightness + 0.05)
+                self.update_display()
+                time.sleep(0.2)
+                return 'adjust'
+            elif buttons[2]:  # DOWN button
+                self.current_brightness = max(0.0, self.current_brightness - 0.05)
+                self.update_display()
+                time.sleep(0.2)
+                return 'adjust'
+            elif buttons[1]:  # RIGHT button
+                return 'confirm'
+            elif buttons[0]:  # LEFT button
+                return 'back'
+
         return None
 
     def run(self):
