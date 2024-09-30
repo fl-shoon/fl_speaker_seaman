@@ -15,6 +15,9 @@ class OpenAIModule:
         self.retry_delay = 5
         self.executor = ThreadPoolExecutor(max_workers=3)
 
+    def __del__(self):
+        self.executor.shutdown(wait=True)
+
     def generate_text(self, prompt: str) -> str:
         response = self.client.completions.create(
             model="gpt-4",  
@@ -117,15 +120,11 @@ class OpenAIModule:
             base, ext = os.path.splitext(input_audio_file)
             output_audio_file = f"{base}_response{ext}"
 
-            futures = []
-            with self.executor as executor:
-                futures.append(executor.submit(self.transcribe_audio, input_audio_file))
-
-            for future in as_completed(futures):
-                stt_text = future.result()
-
+            # Transcribe audio
+            stt_text = self.transcribe_audio(input_audio_file)
             logging.info(f"Transcript: {stt_text}")
 
+            # Generate content
             content_response = self.chat(stt_text)
             conversation_ended = '[END_OF_CONVERSATION]' in content_response
             content_response = content_response.replace('[END_OF_CONVERSATION]', '').strip()
@@ -133,33 +132,36 @@ class OpenAIModule:
             logging.info(f"AI response: {content_response}")
             logging.info(f"Conversation ended: {conversation_ended}")
 
-            with self.executor as executor:
-                futures.append(executor.submit(self.text_to_speech, content_response, output_audio_file))
-
-            for future in as_completed(futures):
-                future.result()
+            # Text-to-speech
+            future = self.executor.submit(self.text_to_speech, content_response, output_audio_file)
+            future.result()  # Wait for the TTS to complete
 
             logging.info(f'Audio content written to file "{output_audio_file}"')
 
             return output_audio_file, conversation_ended
 
-        except OpenAIError as e:
-            error_message = self.handle_openai_error(e)
+        except Exception as e:
+            logging.error(f"Error in process_audio: {str(e)}")
+            error_message = self.handle_error(e)
             output_audio_file = ErrorAudio
             self.text_to_speech(error_message, output_audio_file)
             return output_audio_file, True
 
-    def handle_openai_error(self, e: OpenAIError) -> str:
-        if e.code == 'insufficient_quota':
-            logging.error("OpenAI API quota exceeded. Please check your plan and billing details.")
-            return "申し訳ありませんが、システムに一時的な問題が発生しています。後ほど再度お試しください。ただいまシステムを終了します。"
-        elif e.code == 'rate_limit_exceeded':
-            logging.warning(f"Rate limit exceeded. Retrying in {self.retry_delay} seconds...")
-            time.sleep(self.retry_delay)
-            return "少々お待ちください。システムが混み合っています。"
+    def handle_error(self, e: Exception) -> str:
+        if isinstance(e, OpenAIError):
+            if getattr(e, 'code', None) == 'insufficient_quota':
+                logging.error("OpenAI API quota exceeded. Please check your plan and billing details.")
+                return "申し訳ありませんが、システムに一時的な問題が発生しています。後ほど再度お試しください。ただいまシステムを終了します。"
+            elif getattr(e, 'code', None) == 'rate_limit_exceeded':
+                logging.warning(f"Rate limit exceeded. Retrying in {self.retry_delay} seconds...")
+                time.sleep(self.retry_delay)
+                return "少々お待ちください。システムが混み合っています。"
+            else:
+                logging.error(f"OpenAI API error: {e}")
+                return "申し訳ありませんが、エラーが発生しました。ただいまシステムを終了します。"
         else:
-            logging.error(f"OpenAI API error: {e}")
-            return "申し訳ありませんが、エラーが発生しました。ただいまシステムを終了します。"
+            logging.error(f"Unexpected error: {str(e)}")
+            return "申し訳ありませんが、予期せぬエラーが発生しました。ただいまシステムを終了します。"
         
     def fallback_text_to_speech(self, text: str, output_file: str):
         duration = 1
