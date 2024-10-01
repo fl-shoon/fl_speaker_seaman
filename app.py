@@ -111,6 +111,8 @@ class VoiceAssistant:
                     logger.info("Maximum silence reached. Ending conversation.")
                     conversation_active = False
                 continue
+            else:
+                silence_count = 0
 
             input_audio_file = AIOutputAudio
             with wave.open(input_audio_file, 'wb') as wf:

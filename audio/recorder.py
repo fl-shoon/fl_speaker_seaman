@@ -1,9 +1,12 @@
-import pyaudio
+import pyaudio, os
 import numpy as np
 import logging
-from collections import deque
-import os
+import torch
+from typing import Optional
+
 from contextlib import contextmanager
+
+from etc.define import *
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,243 +28,127 @@ def suppress_stdout_stderr():
 ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Error: {reason}")
 ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
 
-class SimpleInteractiveRecorder:
-    def __init__(self):
-        self.RATE = 16000
-        self.CHUNK_DURATION_MS = 30
-        self.CHUNK_SIZE = int(self.RATE * self.CHUNK_DURATION_MS / 1000)
-        self.CHANNELS = 1
-        self.FORMAT = pyaudio.paInt16
+class InteractiveRecorder:
+    def __init__(self, vad_aggressiveness): 
+        '''
+        VAD aggressiveness
+        Increasing the value => less sensitive to background noise
+        But, it can lead to less speech detection performance.
 
-        self.SPEECH_WINDOW_MS = 300
-        self.SPEECH_WINDOW_CHUNKS = self.SPEECH_WINDOW_MS // self.CHUNK_DURATION_MS
+        Decreasing the vlaue => more sensitive to potential speech
+        '''
+        self.stream = None
+        self.CHUNK_DURATION_MS = 30  
+        self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
 
-        self.END_SPEECH_WINDOW_MS = 1000
-        self.END_SPEECH_WINDOW_CHUNKS = self.END_SPEECH_WINDOW_MS // self.CHUNK_DURATION_MS
+        model_path='silero_vad.jit'
+        try:
+            self.model = torch.jit.load(model_path)
+            self.model.eval()
+        except Exception as e:
+            logger.error(f"Failed to load Silero VAD model: {e}")
+            raise
 
         with suppress_stdout_stderr():
-            self.audio = pyaudio.PyAudio()
+            self.p = pyaudio.PyAudio()
 
         try:
-            asound = self.audio._lib_pa.pa_get_library_by_name('libasound.so.2')
+            asound = self.p._lib_pa.pa_get_library_by_name('libasound.so.2')
             asound.snd_lib_error_set_handler(ERROR_HANDLER_FUNC_PTR)
         except:
             logger.warning("Failed to set ALSA error handler")
 
-        self.stream = None
-
     def start_stream(self):
         with suppress_stdout_stderr():
-            self.stream = self.audio.open(
-                format=self.FORMAT,
-                channels=self.CHANNELS,
-                rate=self.RATE,
-                input=True,
-                frames_per_buffer=self.CHUNK_SIZE
-            )
+            self.stream = self.p.open(format=pyaudio.paInt16,
+                                  channels=CHANNELS,
+                                  rate=RATE,
+                                  input=True,
+                                  frames_per_buffer=self.CHUNK_SIZE)
 
     def stop_stream(self):
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
-        self.audio.terminate()
+        self.p.terminate()
 
-    def calculate_energy(self, audio_chunk):
-        return np.mean(np.abs(audio_chunk))
+    def record_question(self, max_duration: int = 10) -> Optional[bytes]:
+        '''
+        Silence_threadshold is so low because mic's audio output levels were generally very low.
+        Setting the small value enhances the detection of quieter speech.
 
-    def record_question(self, energy_threshold=0.01, end_energy_threshold=0.008, max_duration=10):
+        Increasing silence_duration allows more natural pauses in speech.
+        '''
         self.start_stream()
+        logger.info("Listening... Speak your question.")
 
         frames = []
-        energies = deque(maxlen=self.END_SPEECH_WINDOW_CHUNKS)
-        is_speech = False
-        speech_count = 0
-        silence_count = 0
+        is_speaking = False
+        last_speech_time = None
+        total_duration = 0
+        max_pause = 1.5 
 
-        max_chunks = int(max_duration * 1000 / self.CHUNK_DURATION_MS)
+        '''
+        Initial silence duration to decide to stop recording due to no speech
+        '''
+        initial_silence_duration = 2
 
-        for _ in range(max_chunks):
+        while total_duration < max_duration:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
-            audio_chunk = np.frombuffer(data, dtype=np.int16)
-            energy = self.calculate_energy(audio_chunk)
-            energies.append(energy)
+            frames.append(data)
+            total_duration += self.CHUNK_DURATION_MS / 1000
 
-            if energy > energy_threshold:
-                speech_count += 1
-                silence_count = 0
-                if speech_count >= self.SPEECH_WINDOW_CHUNKS and not is_speech:
-                    is_speech = True
-                    logger.info("Speech detected, started recording")
-            else:
-                silence_count += 1
-                speech_count = 0
+            audio_int16 = np.frombuffer(data, np.int16)
+            audio_float32 = audio_int16.astype(np.float32) / 32768.0
+            audio_tensor = torch.from_numpy(audio_float32)
+            speech_prob = self.model(audio_tensor, RATE).item()
 
-            if is_speech:
-                frames.append(data)
+            current_time = total_duration
 
-                # Check for end of speech
-                if len(energies) == self.END_SPEECH_WINDOW_CHUNKS:
-                    average_energy = np.mean(energies)
-                    if average_energy < end_energy_threshold:
-                        logger.info("End of speech detected")
-                        break
+            if speech_prob > 0.5: #speech_threshold -> 0.5/50% confidence of detection
+                if not is_speaking:
+                    is_speaking = True
+                    logger.info("Speech detected. Recording...")
+                last_speech_time = current_time
+            elif is_speaking:
+                pause_duration = current_time - last_speech_time
+                if pause_duration > max_pause:
+                    logger.info(f"End of speech detected. Total duration: {total_duration:.2f}s")
+                    break
 
-            # Break if max duration reached
-            if len(frames) >= max_chunks:
-                logger.info("Maximum duration reached")
-                break
+            if not is_speaking and total_duration > initial_silence_duration:
+                logger.info("No speech detected. Stopping recording.")
+                return None
 
         self.stop_stream()
 
-        # Trim silence at the end
-        while frames and self.calculate_energy(np.frombuffer(frames[-1], dtype=np.int16)) < end_energy_threshold:
-            frames.pop()
+        if not is_speaking:
+            logger.info("No speech detected. Returning None.")
+            return None
 
-        return b''.join(frames) if frames else None
+        logger.info(f"Recording complete. Total duration: {total_duration:.2f}s")
+        self.play_stop_listening_cue()
+        return b''.join(frames)
 
-def record_audio():
-    recorder = SimpleInteractiveRecorder()
-    return recorder.record_question(energy_threshold=0.01, end_energy_threshold=0.008, max_duration=10)
-# import pyaudio
-# import numpy as np
-# import logging
-# import webrtcvad 
-# from collections import deque
-# from etc.define import *
-# from contextlib import contextmanager
+def play_stop_listening_cue(self):
+    # Generate a simple beep sound
+    duration = 0.2  # seconds
+    frequency = 880  # Hz (A5 note)
+    sample_rate = 44100  # standard sample rate
 
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
+    t = np.linspace(0, duration, int(sample_rate * duration), False)
+    audio = np.sin(2 * np.pi * frequency * t)
+    audio = (audio * 32767).astype(np.int16)
 
-# @contextmanager
-# def suppress_stdout_stderr():
-#     """A context manager that redirects stdout and stderr to devnull"""
-#     try:
-#         null = os.open(os.devnull, os.O_RDWR)
-#         save_stdout, save_stderr = os.dup(1), os.dup(2)
-#         os.dup2(null, 1)
-#         os.dup2(null, 2)
-#         yield
-#     finally:
-#         os.dup2(save_stdout, 1)
-#         os.dup2(save_stderr, 2)
-#         os.close(null)
+    with suppress_stdout_stderr():
+        stream = self.p.open(format=pyaudio.paInt16,
+                             channels=1,
+                             rate=sample_rate,
+                             output=True)
+        stream.write(audio.tobytes())
+        stream.stop_stream()
+        stream.close()
 
-# ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Error: {reason}")
-# ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
-
-# class InteractiveRecorder:
-#     def __init__(self, vad_aggressiveness=3):
-#         '''
-#         VAD aggressiveness
-#         Increasing the value => less sensitive to background noise
-#         But, it can lead to less speech detection performance.
-
-#         Decreasing the vlaue => more sensitive to potential speech
-#         '''
-#         self.vad = webrtcvad.Vad(vad_aggressiveness)
-#         self.stream = None
-#         self.CHUNK_DURATION_MS = 10
-#         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
-#         self.SPEECH_CHUNKS = int(0.1 * 1000 / self.CHUNK_DURATION_MS)
-#         self.PAUSE_WINDOW = int(1.0 * 1000 / self.CHUNK_DURATION_MS)
-#         self.ENERGY_WINDOW = int(2.0 * 1000 / self.CHUNK_DURATION_MS)
-
-#         with suppress_stdout_stderr():
-#             self.audio = pyaudio.PyAudio()
-
-#         try:
-#             asound = self.audio._lib_pa.pa_get_library_by_name('libasound.so.2')
-#             asound.snd_lib_error_set_handler(ERROR_HANDLER_FUNC_PTR)
-#         except:
-#             logger.warning("Failed to set ALSA error handler")
-
-#     def start_stream(self):
-#         with suppress_stdout_stderr():
-#             self.stream = self.audio.open(format=pyaudio.paInt16,
-#                                       channels=CHANNELS,
-#                                       rate=RATE,
-#                                       input=True,
-#                                       frames_per_buffer=self.CHUNK_SIZE)
-
-#     def stop_stream(self):
-#         if self.stream:
-#             self.stream.stop_stream()
-#             self.stream.close()
-#         self.audio.terminate()
-
-#     def is_speech(self, data):
-#         return self.vad.is_speech(data, RATE)
-
-#     def record_question(self, initial_silence_threshold=0.015, energy_threshold=0.3, max_duration=10):
-#         self.start_stream()
-
-#         frames = []
-#         speech_chunks = 0
-#         total_chunks = 0
-#         start_recording = False
-#         buffer_queue = deque(maxlen=self.PAUSE_WINDOW)
-#         energy_window = deque(maxlen=self.ENERGY_WINDOW)
-#         max_energy = 0
-#         dynamic_silence_threshold = initial_silence_threshold
-#         last_speech_chunk = 0
-#         silence_counter = 0
-#         speech_detected = False
-
-#         max_chunks = int(max_duration * 1000 / self.CHUNK_DURATION_MS)
-
-#         while total_chunks < max_chunks:
-#             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
-#             frames.append(data)
-#             buffer_queue.append(data)
-#             total_chunks += 1
-
-#             is_speech = self.is_speech(data)
-#             audio_chunk = np.frombuffer(data, dtype=np.int16)
-#             volume = np.abs(audio_chunk).mean() / 32767
-#             energy_window.append(volume)
-
-#             if volume > max_energy:
-#                 max_energy = volume
-#                 dynamic_silence_threshold = max(initial_silence_threshold, max_energy * 0.1)
-
-#             if is_speech or volume > dynamic_silence_threshold:
-#                 speech_chunks += 1
-#                 last_speech_chunk = total_chunks
-#                 silence_counter = 0
-#                 if speech_chunks >= self.SPEECH_CHUNKS and not start_recording:
-#                     start_recording = True
-#                     speech_detected = True
-#                     frames = list(buffer_queue) + frames
-#                     logger.info("Speech detected, started recording")
-#             else:
-#                 silence_counter += 1
-#                 speech_chunks = max(0, speech_chunks - 1)
-
-#             if start_recording:
-#                 avg_energy = sum(energy_window) / len(energy_window)
-#                 recent_energy = sum(list(energy_window)[-10:]) / 10
-
-#                 if recent_energy < dynamic_silence_threshold and avg_energy < energy_threshold * max_energy:
-#                     if silence_counter >= self.PAUSE_WINDOW:
-#                         logger.info("End of speech detected")
-#                         frames = frames[:-(silence_counter - self.PAUSE_WINDOW // 2)]
-#                         break
-
-#             if not speech_detected and total_chunks > max_chunks * 0.8:
-#                 logger.info("No speech detected, stopping recording")
-#                 return None
-
-#         self.stop_stream()
-#         if total_chunks >= max_chunks:
-#             logger.info("Maximum duration reached")
-#             silence_threshold = max(initial_silence_threshold, max_energy * 0.05)
-#             while frames and np.abs(np.frombuffer(frames[-1], dtype=np.int16)).mean() / 32767 < silence_threshold:
-#                 frames.pop()
-
-#         return b''.join(frames) if frames else None
-
-
-# def record_audio():
-#     recorder = InteractiveRecorder(vad_aggressiveness=3)
-#     return recorder.record_question(initial_silence_threshold=0.015, energy_threshold=0.3, max_duration=10)
+def record_audio() -> Optional[bytes]:
+    recorder = InteractiveRecorder()
+    return recorder.record_question()

@@ -3,12 +3,16 @@ import sys
 import os
 import venv
 import argparse
+import urllib.request
+import json
 
 class RaspberryPiSetup:
     def __init__(self, venv_path=".venv"):
         self.venv_path = venv_path
         self.python_path = os.path.join(self.venv_path, "bin", "python")
         self.pip_path = os.path.join(self.venv_path, "bin", "pip")
+        self.audio_processing_model_url = "https://models.silero.ai/vad_models/silero_vad.jit"
+        self.audio_processing_model_path = 'silero_vad.jit'
 
     def run_command(self, command):
         try:
@@ -58,8 +62,8 @@ class RaspberryPiSetup:
             "rx",
             "Pillow",
             "numpy",
-            "RPi.GPIO",
-            "firebase-admin"
+            "torch",
+            "torchaudio"
         ]
         for package in packages:
             if not self.install_package(package):
@@ -77,9 +81,22 @@ class RaspberryPiSetup:
         if not self.install_python_packages():
             print("Failed to install Python packages. Exiting.")
             return False
+        if not self.download_silero_vad_model():
+            print("Failed to download Silero VAD model. Exiting.")
+            return False
         print("Setup completed successfully!")
         print(f"To activate the virtual environment, run: source {os.path.join(self.venv_path, 'bin', 'activate')}")
         return True
+    
+    def download_silero_vad_model(self):
+        print("Downloading Silero VAD model...")
+        try:
+            urllib.request.urlretrieve(self.audio_processing_model_url, self.audio_processing_model_path)
+            print(f"Model downloaded and saved to {self.model_path}")
+            return True
+        except Exception as e:
+            print(f"Error downloading Silero VAD model: {e}")
+            return False
 
 def main():
     parser = argparse.ArgumentParser(description="Raspberry Pi Setup Script")
