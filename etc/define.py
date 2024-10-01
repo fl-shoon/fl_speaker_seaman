@@ -75,7 +75,6 @@ SeamanLogo = os.path.join(IMAGE_DIR, "logo.png")
 SatoruHappy = os.path.join(IMAGE_DIR, "happy.png")
 
 # voice trigger 
-PicoAccessKey = os.environ["PICO_ACCESS_KEY"] 
 PicoLangModel = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_language_model_ja.pv")
 PicoWakeWordHello = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_wake_word_konnichiwa.ppn") 
 ToshibaVoiceDictionary = os.path.join(VOICE_TRIGGER_DIR,"toshiba_voice_dict_jaJP.vtdic")

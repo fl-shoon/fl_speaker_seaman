@@ -62,7 +62,8 @@ class RaspberryPiSetup:
             "Pillow",
             "numpy",
             "torch",
-            "torchaudio"
+            "torchaudio",
+            "pvporcupine"
         ]
         for package in packages:
             if not self.install_package(package):

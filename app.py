@@ -212,7 +212,7 @@ if __name__ == '__main__':
     parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
     
     # Pico
-    parser.add_argument('--access_key', help='AccessKey for Porcupine', default=PicoAccessKey)
+    parser.add_argument('--access_key', help='AccessKey for Porcupine', default=os.environ["PICO_ACCESS_KEY"])
     parser.add_argument('--keyword_paths', nargs='+', help="Paths to keyword model files", default=PicoWakeWordHello)
     parser.add_argument('--model_path', help='Path to Porcupine model file', default=PicoLangModel)
 
