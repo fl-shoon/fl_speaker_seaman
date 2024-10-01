@@ -90,7 +90,7 @@ class RaspberryPiSetup:
     
     def download_silero_vad_model(self):
         if os.path.exists(self.audio_processing_model_path):
-            print(f"Silero VAD model already exists at {self.model_path}. Skipping download.")
+            print(f"Silero VAD model already exists. Skipping download.")
             return True
         print("Downloading Silero VAD model...")
         script = f"""
