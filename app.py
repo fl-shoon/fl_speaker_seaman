@@ -170,6 +170,7 @@ class VoiceAssistant:
 
         self.display.fade_in_logo(SeamanLogo)
         self.audio_threadshold_calibration_done = False
+        self.interactive_recorder.stop_stream()
 
     def run(self):
         try:
