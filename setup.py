@@ -90,13 +90,23 @@ class RaspberryPiSetup:
     
     def download_silero_vad_model(self):
         print("Downloading Silero VAD model...")
-        try:
-            urllib.request.urlretrieve(self.audio_processing_model_url, self.audio_processing_model_path)
-            print(f"Model downloaded and saved to {self.model_path}")
-            return True
-        except Exception as e:
-            print(f"Error downloading Silero VAD model: {e}")
-            return False
+        script = f"""
+import torch
+
+model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
+                              model='silero_vad',
+                              force_reload=True,
+                              onnx=False)
+
+torch.jit.save(model, '{self.model_path}')
+print(f"Model downloaded and saved to {self.model_path}")
+"""
+        with open("download_model.py", "w") as f:
+            f.write(script)
+
+        result = self.run_command(f"{self.python_path} download_model.py")
+        os.remove("download_model.py")
+        return result
 
 def main():
     parser = argparse.ArgumentParser(description="Raspberry Pi Setup Script")
