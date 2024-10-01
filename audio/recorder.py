@@ -42,6 +42,7 @@ class InteractiveRecorder:
         self.energy_threshold = None
         self.silence_energy = None
         self.speech_energy = None
+        self.calibration_done = False
 
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
@@ -77,6 +78,7 @@ class InteractiveRecorder:
 
     def calibrate_energy_threshold(self, duration=5):
         self.start_stream()
+        logger.info("Calibrating energy threshold. Please remain silent...")
         energy_levels = []
         for _ in range(duration * self.CHUNKS_PER_SECOND):
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -87,14 +89,18 @@ class InteractiveRecorder:
         
         self.silence_energy = np.mean(energy_levels)
         self.energy_threshold = self.silence_energy * 2 
+        logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
+        self.stop_stream()
+        self.calibration_done = True
 
     def record_question(self, silence_duration, max_duration):
         if self.energy_threshold is None:
-            self.calibrate_energy_threshold()
-        else:
-            self.start_stream()
+            return None
 
-        play_audio(ResponseAudio)
+        if not self.calibration_done:
+            return None
+        
+        self.start_stream()
         logging.info("Listening... Speak your question.")
 
         frames = []
@@ -143,6 +149,7 @@ class InteractiveRecorder:
 
         self.stop_stream()
         play_audio(self.beep_file)
+        self.calibration_done = False
         return b''.join(frames)
 
     def generate_beep_file(self):
@@ -168,7 +175,3 @@ class InteractiveRecorder:
     def __del__(self):
         if hasattr(self, 'beep_file') and os.path.exists(self.beep_file):
             os.remove(self.beep_file)
-            
-def record_audio():
-    recorder = InteractiveRecorder()
-    return recorder.record_question(silence_duration=1.5, max_duration=30)

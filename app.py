@@ -8,7 +8,7 @@ from threading import Event
 
 from openAI.conversation import OpenAIModule
 from audio.player import sync_audio_and_gif, play_audio
-from audio.recorder import record_audio
+from audio.recorder import InteractiveRecorder
 from display.show import DisplayModule
 from etc.define import *
 from pvrecorder import PvRecorder
@@ -33,8 +33,7 @@ class VoiceAssistant:
         self.porcupine = None
         self.ai_client = None
         self.audio_threshold_calibration_done = False
-        self.calibration_attempts = 0
-        self.max_calibration_attempts = 3
+        self.interactive_recorder = InteractiveRecorder()
 
     def initialize(self):
         try:
@@ -67,17 +66,11 @@ class VoiceAssistant:
     def handle_audio_calibration(self):
         if not self.audio_threshold_calibration_done:
             logger.info("Starting calibration process...")
-            
-            calibration_audio = record_audio()
-            
-            if calibration_audio is not None:
-                logger.info("Calibration completed successfully.")
-                self.audio_threshold_calibration_done = True
-                return self.audio_threshold_calibration_done
-            else:
-                self.audio_threshold_calibration_done = False
-                return False
-            
+            self.interactive_recorder.calibrate_energy_threshold()
+            logger.info("Calibration completed successfully.")
+            self.audio_threshold_calibration_done = self.interactive_recorder.calibration_done
+        return self.audio_threshold_calibration_done
+
     def ensure_serial_connection(self):
         if not self.serial_module.isPortOpen:
             logger.info("Serial connection closed. Attempting to reopen...")
@@ -117,6 +110,7 @@ class VoiceAssistant:
                     '''
                     logger.info("Wake word detected")
                     if self.handle_audio_calibration():
+                        play_audio(ResponseAudio)
                         return True
                     else:
                         logger.info("Calibration failed. Returning to wake word detection.")
@@ -137,7 +131,7 @@ class VoiceAssistant:
                 break
 
             self.display.start_listening_display(SatoruHappy)
-            audio_data = record_audio()
+            audio_data = self.interactive_recorder.record_question(silence_duration=1.5, max_duration=30)
 
             if not audio_data:
                 silence_count += 1
@@ -163,11 +157,9 @@ class VoiceAssistant:
                     sync_audio_and_gif(self.display, response_file, SpeakingGif)
                     if conversation_ended:
                         conversation_active = False
-                        self.audio_threadshold_calibration_done = False
                 else:
                     logger.info("No response generated. Ending conversation.")
                     conversation_active = False
-                    self.audio_threadshold_calibration_done = False
             except Exception as e:
                 logger.error(f"Error processing conversation: {e}")
                 error_message = self.ai_client.handle_openai_error(e)
@@ -175,9 +167,9 @@ class VoiceAssistant:
                 self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
                 sync_audio_and_gif(self.display, error_audio_file, SpeakingGif)
                 conversation_active = False
-                self.audio_threadshold_calibration_done = False
 
         self.display.fade_in_logo(SeamanLogo)
+        self.audio_threadshold_calibration_done = False
 
     def run(self):
         try:
