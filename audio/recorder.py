@@ -44,8 +44,9 @@ class InteractiveRecorder:
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.stream = None
         self.beep_file = self.generate_beep_file()
-        self.CHUNK_DURATION_MS = 50  
+        self.CHUNK_DURATION_MS = 30  
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
+        self.CHUNKS_PER_SECOND = 1000 // self.CHUNK_DURATION_MS
 
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
@@ -81,62 +82,50 @@ class InteractiveRecorder:
         logger.info("Listening... Speak your question.")
 
         frames = []
-        silent_frames = 0
+        silent_chunks = 0
         is_speaking = False
-        speech_frames = 0
-        total_frames = 0
+        speech_chunks = 0
+        total_chunks = 0
 
-        '''
-        Consecutive speech to prevent false starts due to brief noises
-        Here, frame value is too small due to mic's audio output quality.
-        '''
-        consecutive_speech_frames = 2
-
-        '''
-        Initial silence duration to decide to stop recording due to no speech
-        '''
-        initial_silence_duration = 3
-
-        max_silent_frames = int(silence_duration * RATE / self.CHUNK_SIZE) # calculates how many silent chunks correspond to the silence_duration
+        consecutive_speech_chunks = 3
+        initial_silence_chunks = 3 * self.CHUNKS_PER_SECOND
+        max_silent_chunks = int(silence_duration * self.CHUNKS_PER_SECOND)
 
         while True:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
             frames.append(data)
-            total_frames += 1
+            total_chunks += 1
 
             audio_chunk = np.frombuffer(data, dtype=np.int16)
-            audio_level = np.abs(audio_chunk).mean() / 32767 
-            '''
-            32767 is the maximum positive value for a 16-bit signed integer
-            calculates the average absolute amplitude of the audio chunk, normalized to a 0-1 range
-            '''  
+            audio_level = np.abs(audio_chunk).mean() / 32767  
 
             try:
                 is_speech = self.vad.is_speech(data, RATE)
             except Exception as e:
                 logger.error(f"VAD error: {e}")
-                is_speech = False
+                is_speech = audio_level > silence_threshold  # Fallback to audio level
 
             if is_speech or audio_level > silence_threshold:
-                speech_frames += 1
-                silent_frames = 0
-                if not is_speaking and speech_frames > consecutive_speech_frames:
+                speech_chunks += 1
+                silent_chunks = 0
+                if not is_speaking and speech_chunks > consecutive_speech_chunks:
                     logger.info("Speech detected. Recording...")
                     is_speaking = True
             else: 
-                silent_frames += 1
-                speech_frames = max(0, speech_frames - 1)
+                silent_chunks += 1
+                speech_chunks = max(0, speech_chunks - 1)
 
             if is_speaking:
-                if silent_frames > max_silent_frames:
-                    logger.info(f"End of speech detected. Total frames: {total_frames}")
+                if silent_chunks > max_silent_chunks:
+                    logger.info(f"End of speech detected. Total chunks: {total_chunks}")
                     break
-            elif total_frames > initial_silence_duration * RATE / self.CHUNK_SIZE:  
+            elif total_chunks > initial_silence_chunks:  
                 logger.info("No speech detected. Stopping recording.")
                 return None
 
-            if total_frames > max_duration * RATE / self.CHUNK_SIZE:
-                logger.info(f"Maximum duration reached. Total frames: {total_frames}")
+            logger.debug(f"Chunk {total_chunks}: Audio level: {audio_level:.4f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}, Speech chunks: {speech_chunks}")
+            if total_chunks > max_duration * self.CHUNKS_PER_SECOND:
+                logger.info(f"Maximum duration reached. Total chunks: {total_chunks}")
                 break
 
         self.stop_stream()
@@ -169,7 +158,7 @@ class InteractiveRecorder:
             
 def record_audio():
     recorder = InteractiveRecorder(vad_aggressiveness=2)
-    return recorder.record_question(silence_threshold=0.03, silence_duration=1.5, max_duration=10)
+    return recorder.record_question(silence_threshold=0.02, silence_duration=1.5, max_duration=10)
 
 if __name__ == "__main__":
     print("Testing speech detection. Speak into your microphone...")
