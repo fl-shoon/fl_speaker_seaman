@@ -12,6 +12,7 @@ from audio.recorder import record_audio
 from display.show import DisplayModule
 from etc.define import *
 from pvrecorder import PvRecorder
+from pico.pico import PicoVoiceTrigger
 from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
 from transmission.serialModule import SerialModule
 
@@ -29,6 +30,7 @@ class VoiceAssistant:
         self.display = None
         self.recorder = None
         self.vt = None
+        self.porcupine = None
         self.ai_client = None
 
     def initialize(self):
@@ -41,10 +43,16 @@ class VoiceAssistant:
                 raise ConnectionError(f"Failed to open serial port {USBPort}")
 
             self.ai_client = OpenAIModule()
-            self.vt = ToshibaVoiceTrigger(self.args.vtdic)
-            self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
-            
-            self.recorder = PvRecorder(frame_length=self.vt.frame_size)
+            try:
+                self.vt = ToshibaVoiceTrigger(self.args.vtdic)
+                self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
+                
+                self.recorder = PvRecorder(frame_length=self.vt.frame_size)
+            except Exception as e:
+                self.vt = None
+                logger.info("Failed to initialize toshiba. Using pico instead")
+                self.porcupine = PicoVoiceTrigger(self.args)
+                self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
             
             logger.info("Voice Assistant initialized successfully")
         except Exception as e:
@@ -73,8 +81,15 @@ class VoiceAssistant:
             while not exit_event.is_set():
                 audio_frame = self.recorder.read()
                 audio_data = np.array(audio_frame, dtype=np.int16)
-                detections = self.vt.process(audio_data)
-                if any(detections):
+
+                if self.vt: 
+                    detections = self.vt.process(audio_data)
+                    wake_word_triggered = any(detections)
+                else: 
+                    detections = self.porcupine.process(audio_frame)
+                    wake_word_triggered = detections >= 0
+                
+                if wake_word_triggered:
                     '''
                     All in one operation to both detect 
                     if a wake word was spoken and 
@@ -192,8 +207,15 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal_handler)
 
     parser = argparse.ArgumentParser()
+    # Toshiba
     parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
     parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
+    
+    # Pico
+    parser.add_argument('--access_key', help='AccessKey for Porcupine', default=PicoAccessKey)
+    parser.add_argument('--keyword_paths', nargs='+', help="Paths to keyword model files", default=PicoWakeWordHello)
+    parser.add_argument('--model_path', help='Path to Porcupine model file', default=PicoLangModel)
+
     args = parser.parse_args()
 
     assistant = VoiceAssistant(args)
