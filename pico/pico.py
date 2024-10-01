@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 class PicoVoiceTrigger:
     def __init__(self, args):
         self.porcupine = self._create_porcupine(args.access_key, args.model_path, args.keyword_paths, args.sensitivities)
+        self.frame_length = self.porcupine.frame_length
 
     def _create_porcupine(self,access_key, model_path, keyword_paths, sensitivities):
         try:
@@ -34,5 +35,7 @@ class PicoVoiceTrigger:
             logger.info(f"Failed to initialize Porcupine: {e}")
             raise e
     
-    def getPico(self):
-        return self.porcupine
+    def process(self, audio_frame):
+        return self.porcupine.process(audio_frame)
+    
+    
