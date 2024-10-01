@@ -74,7 +74,8 @@ class InteractiveRecorder:
         return y
 
     def calibrate_energy_threshold(self, duration=5):
-        self.start_stream()
+        if self.stream is None:
+            self.start_stream()
         energy_levels = []
         for _ in range(duration * self.CHUNKS_PER_SECOND):
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -86,11 +87,13 @@ class InteractiveRecorder:
         self.silence_energy = np.mean(energy_levels)
         self.energy_threshold = self.silence_energy * 2 
         logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
+        self.stop_stream()
 
     def record_question(self, silence_duration, max_duration):
         if self.energy_threshold is None:
             return None
 
+        self.start_stream()
         logging.info("Listening... Speak your question.")
 
         frames = []
@@ -140,7 +143,8 @@ class InteractiveRecorder:
                 logging.info(f"Maximum duration reached. Total chunks: {total_chunks}")
                 break
 
-        # play_audio(self.beep_file)
+        play_audio(self.beep_file)
+        self.stop_stream()
         return b''.join(frames)
 
     def generate_beep_file(self):
