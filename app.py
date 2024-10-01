@@ -68,7 +68,7 @@ class VoiceAssistant:
             logger.info("Starting calibration process...")
             self.interactive_recorder.calibrate_energy_threshold()
             logger.info("Calibration completed successfully.")
-            self.audio_threshold_calibration_done = self.interactive_recorder.calibration_done
+            self.audio_threshold_calibration_done = True
         return self.audio_threshold_calibration_done
 
     def ensure_serial_connection(self):
