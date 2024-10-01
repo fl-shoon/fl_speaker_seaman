@@ -43,7 +43,7 @@ class InteractiveRecorder:
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
         self.CHUNKS_PER_SECOND = 1000 // self.CHUNK_DURATION_MS
 
-        self.audio_buffer = deque(maxlen=20)  
+        self.audio_buffer = deque(maxlen=20)
         self.energy_threshold = None
 
         with suppress_stdout_stderr():
@@ -56,18 +56,22 @@ class InteractiveRecorder:
             logger.warning("Failed to set ALSA error handler")
 
     def start_stream(self):
-        with suppress_stdout_stderr():
-            self.stream = self.p.open(format=pyaudio.paInt16,
-                                  channels=CHANNELS,
-                                  rate=RATE,
-                                  input=True,
-                                  frames_per_buffer=self.CHUNK_SIZE)
+        if self.stream is None:
+            with suppress_stdout_stderr():
+                self.stream = self.p.open(format=pyaudio.paInt16,
+                                          channels=CHANNELS,
+                                          rate=RATE,
+                                          input=True,
+                                          frames_per_buffer=self.CHUNK_SIZE)
+        logger.debug("Audio stream started")
 
     def stop_stream(self):
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
+            self.stream = None
         self.p.terminate()
+        logger.debug("Audio stream stopped")
 
     def butter_lowpass(self, cutoff, fs, order=5):
         nyq = 0.5 * fs
@@ -82,6 +86,7 @@ class InteractiveRecorder:
 
     def calibrate_energy_threshold(self, duration=5):
         logger.info("Calibrating energy threshold. Please remain silent...")
+        self.start_stream()  
         energy_levels = []
         for _ in range(duration * self.CHUNKS_PER_SECOND):
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -89,14 +94,15 @@ class InteractiveRecorder:
             filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
             energy = np.sum(filtered_audio**2) / len(filtered_audio)
             energy_levels.append(energy)
-        self.energy_threshold = np.mean(energy_levels) * 1.2  # 20% above average noise
+        self.energy_threshold = np.mean(energy_levels) * 1.2 
         logger.info(f"Energy threshold set to: {self.energy_threshold}")
 
     def record_question(self, silence_duration, max_duration):
         if self.energy_threshold is None:
             self.calibrate_energy_threshold()
+        else:
+            self.start_stream()  
 
-        self.start_stream()
         logger.info("Listening... Speak your question.")
 
         frames = []
@@ -126,7 +132,7 @@ class InteractiveRecorder:
                 is_speech = self.vad.is_speech(data, RATE)
             except Exception as e:
                 logger.error(f"VAD error: {e}")
-                is_speech = energy > self.energy_threshold  # Fallback to energy level
+                is_speech = energy > self.energy_threshold  
 
             logger.debug(f"Chunk {total_chunks}: Energy: {energy:.2f}, Average energy: {average_energy:.2f}, Threshold: {self.energy_threshold:.2f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}, Speech chunks: {speech_chunks}")
 
@@ -144,11 +150,12 @@ class InteractiveRecorder:
                 if silent_chunks > max_silent_chunks:
                     logger.info(f"End of speech detected. Total chunks: {total_chunks}")
                     break
-                elif average_energy < self.energy_threshold * 0.8:  # Additional check for sustained low energy
+                elif average_energy < self.energy_threshold * 0.8:  
                     logger.info(f"Sustained low energy detected. Ending recording. Total chunks: {total_chunks}")
                     break
             elif total_chunks > initial_silence_chunks:  
                 logger.info("No speech detected. Stopping recording.")
+                self.stop_stream()
                 return None
 
             if total_chunks > max_duration * self.CHUNKS_PER_SECOND:
