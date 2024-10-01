@@ -73,12 +73,6 @@ class InteractiveRecorder:
         self.p.terminate()
 
     def record_question(self, max_duration: int = 10) -> Optional[bytes]:
-        '''
-        Silence_threadshold is so low because mic's audio output levels were generally very low.
-        Setting the small value enhances the detection of quieter speech.
-
-        Increasing silence_duration allows more natural pauses in speech.
-        '''
         self.start_stream()
         logger.info("Listening... Speak your question.")
 
@@ -86,11 +80,9 @@ class InteractiveRecorder:
         is_speaking = False
         last_speech_time = None
         total_duration = 0
-        max_pause = 1.5 
+        max_pause = 1.5
+        min_recording_duration = 0.5  # Minimum recording duration in seconds
 
-        '''
-        Initial silence duration to decide to stop recording due to no speech
-        '''
         initial_silence_duration = 2
 
         while total_duration < max_duration:
@@ -105,14 +97,14 @@ class InteractiveRecorder:
 
             current_time = total_duration
 
-            if speech_prob > 0.5: #speech_threshold -> 0.5/50% confidence of detection
+            if speech_prob > 0.5:
                 if not is_speaking:
                     is_speaking = True
                     logger.info("Speech detected. Recording...")
                 last_speech_time = current_time
             elif is_speaking:
                 pause_duration = current_time - last_speech_time
-                if pause_duration > max_pause:
+                if pause_duration > max_pause and total_duration > min_recording_duration:
                     logger.info(f"End of speech detected. Total duration: {total_duration:.2f}s")
                     break
 
@@ -122,8 +114,8 @@ class InteractiveRecorder:
 
         self.stop_stream()
 
-        if not is_speaking:
-            logger.info("No speech detected. Returning None.")
+        if not is_speaking or total_duration < min_recording_duration:
+            logger.info("No speech detected or recording too short. Returning None.")
             return None
 
         logger.info(f"Recording complete. Total duration: {total_duration:.2f}s")
