@@ -73,18 +73,10 @@ class VoiceAssistant:
             if calibration_audio is not None:
                 logger.info("Calibration completed successfully.")
                 self.audio_threshold_calibration_done = True
-                self.calibration_attempts = 0
+                return self.audio_threshold_calibration_done
             else:
-                self.calibration_attempts += 1
-                logger.warning(f"Calibration failed. Attempt {self.calibration_attempts} of {self.max_calibration_attempts}")
-                
-                if self.calibration_attempts >= self.max_calibration_attempts:
-                    logger.error("Max calibration attempts reached. Resetting assistant.")
-                    self.audio_threshold_calibration_done = False
-                    self.calibration_attempts = 0
-                    return False
-            
-        return self.audio_threshold_calibration_done
+                self.audio_threshold_calibration_done = False
+                return False
             
     def ensure_serial_connection(self):
         if not self.serial_module.isPortOpen:
