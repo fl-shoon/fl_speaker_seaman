@@ -6,9 +6,9 @@ logger = logging.getLogger(__name__)
 
 class PicoVoiceTrigger:
     def __init__(self, args):
-        self.porcupine = self._create_porcupine(args.access_key, args.model_path, args.keyword_paths, args.sensitivities)
+        self.porcupine = self._create_porcupine(args.access_key, args.model_path, args.keyword_paths)
 
-    def _create_porcupine(self,access_key, model_path, keyword_paths, sensitivities=0.5):
+    def _create_porcupine(self, access_key, model_path, keyword_paths, sensitivities=0.5):
         try:
             return pvporcupine.create(
                 access_key=access_key,
