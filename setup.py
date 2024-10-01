@@ -11,7 +11,6 @@ class RaspberryPiSetup:
         self.venv_path = venv_path
         self.python_path = os.path.join(self.venv_path, "bin", "python")
         self.pip_path = os.path.join(self.venv_path, "bin", "pip")
-        self.audio_processing_model_url = "https://models.silero.ai/vad_models/silero_vad.jit"
         self.audio_processing_model_path = 'silero_vad.jit'
 
     def run_command(self, command):
@@ -98,8 +97,8 @@ model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
                               force_reload=True,
                               onnx=False)
 
-torch.jit.save(model, '{self.model_path}')
-print(f"Model downloaded and saved to {self.model_path}")
+torch.jit.save(model, '{self.audio_processing_model_path}')
+print(f"Model downloaded and saved to {self.audio_processing_model_path}")
 """
         with open("download_model.py", "w") as f:
             f.write(script)
