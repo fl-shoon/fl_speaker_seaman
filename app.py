@@ -213,17 +213,11 @@ if __name__ == '__main__':
     
     # Pico
     parser.add_argument('--access_key', help='AccessKey for Porcupine', default=os.environ["PICO_ACCESS_KEY"])
-    parser.add_argument('--keyword_paths', nargs='+', help="Paths to keyword model files", default="pico_voice_wake_word_satoru.ppn")
+    parser.add_argument('--keyword_paths', nargs='+', help="Paths to keyword model files", default=[PicoWakeWordSatoru])
     parser.add_argument('--model_path', help='Path to Porcupine model file', default=PicoLangModel)
     parser.add_argument('--sensitivities', nargs='+', help="Sensitivities for keywords", type=float, default=[0.5])
 
     args = parser.parse_args()
-
-    if len(args.keyword_paths) != len(args.sensitivities):
-        if len(args.sensitivities) == 1:
-            args.sensitivities = args.sensitivities * len(args.keyword_paths)
-        else:
-            raise ValueError("Number of keyword paths must match the number of sensitivities, or provide a single sensitivity value.")
 
     assistant = VoiceAssistant(args)
     assistant.run()

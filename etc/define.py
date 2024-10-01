@@ -76,7 +76,7 @@ SatoruHappy = os.path.join(IMAGE_DIR, "happy.png")
 
 # voice trigger 
 PicoLangModel = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_language_model_ja.pv")
-PicoWakeWordHello = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_wake_word_satoru.ppn") 
+PicoWakeWordSatoru = os.path.join(VOICE_TRIGGER_DIR,"pico_voice_wake_word_satoru.ppn") 
 ToshibaVoiceDictionary = os.path.join(VOICE_TRIGGER_DIR,"toshiba_voice_dict_jaJP.vtdic")
 ToshibaVoiceLibrary = os.path.join(VOICE_TRIGGER_DIR,"libVT_ARML64h.so")
 
