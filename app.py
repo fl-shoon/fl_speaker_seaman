@@ -63,7 +63,7 @@ class VoiceAssistant:
             raise
 
     def handle_audio_calibration(self):
-        if not self.calibration_done:
+        if not self.audio_threshold_calibration:
             logger.info("Starting calibration process...")
             
             calibration_audio = record_audio()
@@ -113,7 +113,7 @@ class VoiceAssistant:
                     '''
                     logger.info("Wake word detected")
                     self.handle_audio_calibration()
-                    if self.calibration_done: 
+                    if self.audio_threshold_calibration: 
                         play_audio(ResponseAudio)
                         return True
         except Exception as e:
