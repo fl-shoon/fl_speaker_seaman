@@ -3,8 +3,6 @@ import sys
 import os
 import venv
 import argparse
-import urllib.request
-import json
 
 class RaspberryPiSetup:
     def __init__(self, venv_path=".venv"):
@@ -81,36 +79,10 @@ class RaspberryPiSetup:
         if not self.install_python_packages():
             print("Failed to install Python packages. Exiting.")
             return False
-        if not self.download_silero_vad_model():
-            print("Failed to download Silero VAD model. Exiting.")
-            return False
         print("Setup completed successfully!")
         print(f"To activate the virtual environment, run: source {os.path.join(self.venv_path, 'bin', 'activate')}")
         return True
     
-    def download_silero_vad_model(self):
-        if os.path.exists(self.audio_processing_model_path):
-            print(f"Silero VAD model already exists. Skipping download.")
-            return True
-        print("Downloading Silero VAD model...")
-        script = f"""
-import torch
-
-model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                              model='silero_vad',
-                              force_reload=True,
-                              onnx=False)
-
-torch.jit.save(model, '{self.audio_processing_model_path}')
-print(f"Model downloaded and saved to {self.audio_processing_model_path}")
-"""
-        with open("download_model.py", "w") as f:
-            f.write(script)
-
-        result = self.run_command(f"{self.python_path} download_model.py")
-        os.remove("download_model.py")
-        return result
-
 def main():
     parser = argparse.ArgumentParser(description="Raspberry Pi Setup Script")
     parser.add_argument("--update-system", action="store_true", help="Update system before installation")

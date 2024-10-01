@@ -1,7 +1,6 @@
 import pyaudio, os
 import numpy as np
 import logging
-import torch
 from typing import Optional
 
 from contextlib import contextmanager
@@ -41,14 +40,6 @@ class InteractiveRecorder:
         self.CHUNK_DURATION_MS = 30  
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
 
-        model_path = 'silero_vad.jit'
-        try:
-            self.model = torch.jit.load(model_path)
-            self.model.eval()
-        except Exception as e:
-            logger.error(f"Failed to load Silero VAD model: {e}")
-            self.model = None
-
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
 
@@ -72,54 +63,42 @@ class InteractiveRecorder:
             self.stream.close()
         self.p.terminate()
 
-    def record_question(self, max_duration: int = 10) -> Optional[bytes]:
+    def is_speech(self, audio_chunk, threshold=500):
+        """Detect speech based on audio energy"""
+        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+        energy = np.abs(audio_data).mean()
+        return energy > threshold
+    
+    def record_question(self, max_duration: int = 20) -> Optional[bytes]:
         self.start_stream()
         logger.info("Listening... Speak your question.")
 
         frames = []
         is_speaking = False
-        last_speech_time = None
+        last_speech_time = 0
         total_duration = 0
-        max_pause = 2.0
-        min_recording_duration = 1.0  # Increased minimum recording duration
-        speech_threshold = 0.3  # Lowered speech detection threshold
-
-        initial_silence_duration = 3.0  # Increased initial silence duration
-        min_chunk_duration = 0.032  # Minimum duration for Silero VAD (32ms)
+        max_pause = 1.5
+        min_recording_duration = 1.0
+        initial_silence_duration = 3.0
 
         while total_duration < max_duration:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
             frames.append(data)
-            chunk_duration = len(data) / (RATE * CHANNELS * 2)  # Duration in seconds
+            chunk_duration = len(data) / (RATE * CHANNELS * 2)
             total_duration += chunk_duration
 
-            if chunk_duration < min_chunk_duration:
-                continue  # Skip processing for chunks that are too short
-
-            try:
-                audio_int16 = np.frombuffer(data, np.int16)
-                audio_float32 = audio_int16.astype(np.float32) / 32768.0
-                audio_tensor = torch.from_numpy(audio_float32)
-                speech_prob = self.model(audio_tensor, RATE).item()
-
-                current_time = total_duration
-
-                if speech_prob > speech_threshold:
-                    if not is_speaking:
-                        is_speaking = True
-                        logger.info(f"Speech detected. Recording... (Probability: {speech_prob:.2f})")
-                    last_speech_time = current_time
-                elif is_speaking:
-                    pause_duration = current_time - last_speech_time
-                    if pause_duration > max_pause and total_duration > min_recording_duration:
-                        logger.info(f"End of speech detected. Total duration: {total_duration:.2f}s")
-                        break
-                else:
-                    logger.debug(f"No speech detected. (Probability: {speech_prob:.2f})")
-
-            except ValueError as e:
-                logger.warning(f"Silero VAD error: {e}. Skipping this chunk.")
-                continue
+            if self.is_speech(data):
+                if not is_speaking:
+                    is_speaking = True
+                    logger.info("Speech detected. Recording...")
+                last_speech_time = total_duration
+            elif is_speaking:
+                pause_duration = total_duration - last_speech_time
+                if pause_duration > max_pause and total_duration > min_recording_duration:
+                    logger.info(f"End of speech detected. Total duration: {total_duration:.2f}s")
+                    break
+            else:
+                logger.debug("No speech detected.")
 
             if not is_speaking and total_duration > initial_silence_duration:
                 logger.info("Initial silence duration exceeded. Stopping recording.")
@@ -139,7 +118,7 @@ class InteractiveRecorder:
         # Generate a simple beep sound
         duration = 0.2  # seconds
         frequency = 880  # Hz (A5 note)
-        sample_rate = 44100  # standard sample rate
+        sample_rate = 44100  
 
         t = np.linspace(0, duration, int(sample_rate * duration), False)
         audio = np.sin(2 * np.pi * frequency * t)
