@@ -2,17 +2,13 @@ import pyaudio
 import os
 import numpy as np
 import logging
-import webrtcvad
 import tempfile
 import wave
 from scipy.signal import butter, lfilter
 from contextlib import contextmanager
 from collections import deque
-# from etc.define import *
-CHANNELS = 1
-RATE = 16000
-# from audio.player import play_audio
-from player import play_audio
+from etc.define import *
+from audio.player import play_audio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,7 +38,7 @@ class InteractiveRecorder:
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
         self.CHUNKS_PER_SECOND = 1000 // self.CHUNK_DURATION_MS
 
-        self.audio_buffer = deque(maxlen=50)  # Increased buffer size
+        self.audio_buffer = deque(maxlen=50)  
         self.energy_threshold = None
         self.silence_energy = None
         self.speech_energy = None
@@ -80,7 +76,6 @@ class InteractiveRecorder:
         return y
 
     def calibrate_energy_threshold(self, duration=5):
-        logging.info("Calibrating energy threshold. Please remain silent...")
         self.start_stream()
         energy_levels = []
         for _ in range(duration * self.CHUNKS_PER_SECOND):
@@ -91,9 +86,7 @@ class InteractiveRecorder:
             energy_levels.append(energy)
         
         self.silence_energy = np.mean(energy_levels)
-        self.energy_threshold = self.silence_energy * 2  # Set threshold to twice the average silence energy
-        logging.info(f"Silence energy: {self.silence_energy}")
-        logging.info(f"Energy threshold set to: {self.energy_threshold}")
+        self.energy_threshold = self.silence_energy * 2 
 
     def record_question(self, silence_duration, max_duration):
         if self.energy_threshold is None:
@@ -138,7 +131,7 @@ class InteractiveRecorder:
                 if silent_chunks > max_silent_chunks:
                     logging.info(f"End of speech detected. Total chunks: {total_chunks}")
                     break
-            elif total_chunks > 5 * self.CHUNKS_PER_SECOND:  # 5 seconds of initial silence
+            elif total_chunks > 5 * self.CHUNKS_PER_SECOND:  
                 logging.info("No speech detected. Stopping recording.")
                 self.stop_stream()
                 return None
@@ -178,11 +171,3 @@ class InteractiveRecorder:
 def record_audio():
     recorder = InteractiveRecorder()
     return recorder.record_question(silence_duration=1.5, max_duration=30)
-
-if __name__ == "__main__":
-    logger.info("Testing speech detection. Speak into your microphone...")
-    audio_data = record_audio()
-    if audio_data:
-        logger.info(f"Recorded audio data of length: {len(audio_data)} bytes")
-    else:
-        logger.info("No speech detected")

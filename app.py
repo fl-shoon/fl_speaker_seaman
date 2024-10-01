@@ -32,6 +32,7 @@ class VoiceAssistant:
         self.vt = None
         self.porcupine = None
         self.ai_client = None
+        self.audio_threshold_calibration = False
 
     def initialize(self):
         try:
@@ -61,6 +62,18 @@ class VoiceAssistant:
             self.cleanup()
             raise
 
+    def handle_audio_calibration(self):
+        if not self.calibration_done:
+            logger.info("Starting calibration process...")
+            
+            calibration_audio = record_audio()
+            
+            if calibration_audio is not None:
+                logger.info("Calibration completed successfully.")
+                self.audio_threshold_calibration = True
+            else:
+                logger.warning("Calibration failed. Will retry on next wake word detection.")
+            
     def ensure_serial_connection(self):
         if not self.serial_module.isPortOpen:
             logger.info("Serial connection closed. Attempting to reopen...")
@@ -99,8 +112,10 @@ class VoiceAssistant:
                     # logger.info(f"Wake word detected: {detected_keyword}")
                     '''
                     logger.info("Wake word detected")
-                    play_audio(ResponseAudio)
-                    return True
+                    self.handle_audio_calibration()
+                    if self.calibration_done: 
+                        play_audio(ResponseAudio)
+                        return True
         except Exception as e:
             # FIXME: Handle the error and try to process wake word again
             logger.error(f"Error in wake word detection: {e}")
@@ -144,9 +159,11 @@ class VoiceAssistant:
                     sync_audio_and_gif(self.display, response_file, SpeakingGif)
                     if conversation_ended:
                         conversation_active = False
+                        self.audio_threshold_calibration = False
                 else:
                     logger.info("No response generated. Ending conversation.")
                     conversation_active = False
+                    self.audio_threshold_calibration = False
             except Exception as e:
                 logger.error(f"Error processing conversation: {e}")
                 error_message = self.ai_client.handle_openai_error(e)
@@ -154,6 +171,7 @@ class VoiceAssistant:
                 self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
                 sync_audio_and_gif(self.display, error_audio_file, SpeakingGif)
                 conversation_active = False
+                self.audio_threshold_calibration = False
 
         self.display.fade_in_logo(SeamanLogo)
 
