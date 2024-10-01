@@ -135,8 +135,6 @@ class InteractiveRecorder:
                 logger.info("No speech detected. Stopping recording.")
                 return None
 
-            logger.debug(f"Frame {total_frames}: Audio level: {audio_level:.4f}, Is speech: {is_speech}, Silent frames: {silent_frames}, Speech frames: {speech_frames}")
-
             if total_frames > max_duration * RATE / self.CHUNK_SIZE:
                 logger.info(f"Maximum duration reached. Total frames: {total_frames}")
                 break
