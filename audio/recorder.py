@@ -6,8 +6,11 @@ import webrtcvad
 import tempfile
 import wave
 from contextlib import contextmanager
-from etc.define import *
-from audio.player import play_audio
+# from etc.define import *
+CHANNELS = 1
+RATE = 16000
+# from audio.player import play_audio
+from player import play_audio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -167,5 +170,13 @@ class InteractiveRecorder:
             os.remove(self.beep_file)
             
 def record_audio():
-    recorder = InteractiveRecorder(vad_aggressiveness=3)
-    return recorder.record_question(silence_threshold=0.01, silence_duration=1, max_duration=10)
+    recorder = InteractiveRecorder(vad_aggressiveness=2)
+    return recorder.record_question(silence_threshold=0.03, silence_duration=1.5, max_duration=10)
+
+if __name__ == "__main__":
+    print("Testing speech detection. Speak into your microphone...")
+    audio_data = record_audio()
+    if audio_data:
+        print(f"Recorded audio data of length: {len(audio_data)} bytes")
+    else:
+        print("No speech detected")
