@@ -44,7 +44,7 @@ class InteractiveRecorder:
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.stream = None
         self.beep_file = self.generate_beep_file()
-        self.CHUNK_DURATION_MS = 30  
+        self.CHUNK_DURATION_MS = 50  
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
 
         with suppress_stdout_stderr():
@@ -117,8 +117,6 @@ class InteractiveRecorder:
                 logger.error(f"VAD error: {e}")
                 is_speech = False
 
-            logger.debug(f"Frame {total_frames}: Audio level: {audio_level:.4f}, Is speech: {is_speech}")
-
             if is_speech or audio_level > silence_threshold:
                 speech_frames += 1
                 silent_frames = 0
@@ -136,6 +134,8 @@ class InteractiveRecorder:
             elif total_frames > initial_silence_duration * RATE / self.CHUNK_SIZE:  
                 logger.info("No speech detected. Stopping recording.")
                 return None
+
+            logger.debug(f"Frame {total_frames}: Audio level: {audio_level:.4f}, Is speech: {is_speech}, Silent frames: {silent_frames}, Speech frames: {speech_frames}")
 
             if total_frames > max_duration * RATE / self.CHUNK_SIZE:
                 logger.info(f"Maximum duration reached. Total frames: {total_frames}")
