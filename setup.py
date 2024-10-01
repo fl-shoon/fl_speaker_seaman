@@ -56,7 +56,7 @@ class RaspberryPiSetup:
             "openai",
             "PyAudio",
             "webrtcvad",
-            "rx",
+            "scipy",
             "Pillow",
             "numpy",
             "pvporcupine"

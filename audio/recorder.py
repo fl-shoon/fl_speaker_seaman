@@ -5,6 +5,7 @@ import logging
 import webrtcvad
 import tempfile
 import wave
+from scipy.signal import butter, lfilter
 from contextlib import contextmanager
 # from etc.define import *
 CHANNELS = 1
@@ -71,13 +72,18 @@ class InteractiveRecorder:
             self.stream.close()
         self.p.terminate()
 
-    def record_question(self, silence_threshold, silence_duration, max_duration):
-        '''
-        Silence_threadshold is so low because mic's audio output levels were generally very low.
-        Setting the small value enhances the detection of quieter speech.
+    def butter_lowpass(self, cutoff, fs, order=5):
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff / nyq
+        b, a = butter(order, normal_cutoff, btype='low', analog=False)
+        return b, a
 
-        Increasing silence_duration allows more natural pauses in speech.
-        '''
+    def butter_lowpass_filter(self, data, cutoff, fs, order=5):
+        b, a = self.butter_lowpass(cutoff, fs, order=order)
+        y = lfilter(b, a, data)
+        return y
+
+    def record_question(self, silence_threshold, silence_duration, max_duration):
         self.start_stream()
         logger.info("Listening... Speak your question.")
 
@@ -89,6 +95,7 @@ class InteractiveRecorder:
 
         consecutive_speech_chunks = 3
         initial_silence_chunks = 3 * self.CHUNKS_PER_SECOND
+
         max_silent_chunks = int(silence_duration * self.CHUNKS_PER_SECOND)
 
         while True:
@@ -97,15 +104,29 @@ class InteractiveRecorder:
             total_chunks += 1
 
             audio_chunk = np.frombuffer(data, dtype=np.int16)
-            audio_level = np.abs(audio_chunk).mean() / 32767  
+            
+            # Apply low-pass filter
+            filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
+            
+            audio_level = np.abs(filtered_audio).mean() / 32767
+
+            # Update audio buffer
+            self.audio_buffer.append(audio_level)
+            if len(self.audio_buffer) > self.buffer_size:
+                self.audio_buffer.pop(0)
+
+            # Calculate moving average
+            average_level = np.mean(self.audio_buffer)
 
             try:
                 is_speech = self.vad.is_speech(data, RATE)
             except Exception as e:
                 logger.error(f"VAD error: {e}")
-                is_speech = audio_level > silence_threshold  # Fallback to audio level
+                is_speech = average_level > silence_threshold  # Fallback to audio level
 
-            if is_speech or audio_level > silence_threshold:
+            logger.debug(f"Chunk {total_chunks}: Audio level: {audio_level:.4f}, Average level: {average_level:.4f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}, Speech chunks: {speech_chunks}")
+
+            if is_speech or average_level > silence_threshold:
                 speech_chunks += 1
                 silent_chunks = 0
                 if not is_speaking and speech_chunks > consecutive_speech_chunks:
@@ -123,7 +144,6 @@ class InteractiveRecorder:
                 logger.info("No speech detected. Stopping recording.")
                 return None
 
-            logger.debug(f"Chunk {total_chunks}: Audio level: {audio_level:.4f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}, Speech chunks: {speech_chunks}")
             if total_chunks > max_duration * self.CHUNKS_PER_SECOND:
                 logger.info(f"Maximum duration reached. Total chunks: {total_chunks}")
                 break
