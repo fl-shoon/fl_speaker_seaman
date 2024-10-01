@@ -29,7 +29,7 @@ ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Err
 ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
 
 class InteractiveRecorder:
-    def __init__(self, vad_aggressiveness): 
+    def __init__(self): 
         '''
         VAD aggressiveness
         Increasing the value => less sensitive to background noise
