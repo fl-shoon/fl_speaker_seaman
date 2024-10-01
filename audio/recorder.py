@@ -90,7 +90,6 @@ class InteractiveRecorder:
         self.silence_energy = np.mean(energy_levels)
         self.energy_threshold = self.silence_energy * 2 
         logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
-        self.stop_stream()
         self.calibration_done = True
 
     def record_question(self, silence_duration, max_duration):
@@ -100,7 +99,6 @@ class InteractiveRecorder:
         if not self.calibration_done:
             return None
         
-        self.start_stream()
         logging.info("Listening... Speak your question.")
 
         frames = []
