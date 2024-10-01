@@ -55,7 +55,6 @@ class InteractiveRecorder:
                                           rate=RATE,
                                           input=True,
                                           frames_per_buffer=self.CHUNK_SIZE)
-        logging.debug("Audio stream started")
 
     def stop_stream(self):
         if self.stream:
@@ -63,7 +62,6 @@ class InteractiveRecorder:
             self.stream.close()
             self.stream = None
         self.p.terminate()
-        logging.debug("Audio stream stopped")
 
     def butter_lowpass(self, cutoff, fs, order=5):
         nyq = 0.5 * fs
@@ -78,7 +76,6 @@ class InteractiveRecorder:
 
     def calibrate_energy_threshold(self, duration=5):
         self.start_stream()
-        logger.info("Calibrating energy threshold. Please remain silent...")
         energy_levels = []
         for _ in range(duration * self.CHUNKS_PER_SECOND):
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -96,9 +93,6 @@ class InteractiveRecorder:
         if self.energy_threshold is None:
             return None
 
-        if not self.calibration_done:
-            return None
-        
         logging.info("Listening... Speak your question.")
 
         frames = []
