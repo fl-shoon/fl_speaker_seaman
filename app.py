@@ -32,7 +32,7 @@ class VoiceAssistant:
         self.vt = None
         self.porcupine = None
         self.ai_client = None
-        self.audio_threadshold_calibration_done = False
+        self.audio_threshold_calibration_done = False
         self.calibration_attempts = 0
         self.max_calibration_attempts = 3
 
