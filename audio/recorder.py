@@ -41,13 +41,13 @@ class InteractiveRecorder:
         self.CHUNK_DURATION_MS = 30  
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
 
-        model_path='silero_vad.jit'
+        model_path = 'silero_vad.jit'
         try:
             self.model = torch.jit.load(model_path)
             self.model.eval()
         except Exception as e:
             logger.error(f"Failed to load Silero VAD model: {e}")
-            raise
+            self.model = None
 
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
@@ -84,29 +84,38 @@ class InteractiveRecorder:
         min_recording_duration = 0.5  # Minimum recording duration in seconds
 
         initial_silence_duration = 2
+        min_chunk_duration = 0.032  # Minimum duration for Silero VAD (32ms)
 
         while total_duration < max_duration:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
             frames.append(data)
-            total_duration += self.CHUNK_DURATION_MS / 1000
+            chunk_duration = len(data) / (RATE * CHANNELS * 2)  # Duration in seconds
+            total_duration += chunk_duration
 
-            audio_int16 = np.frombuffer(data, np.int16)
-            audio_float32 = audio_int16.astype(np.float32) / 32768.0
-            audio_tensor = torch.from_numpy(audio_float32)
-            speech_prob = self.model(audio_tensor, RATE).item()
+            if chunk_duration < min_chunk_duration:
+                continue  # Skip processing for chunks that are too short
 
-            current_time = total_duration
+            try:
+                audio_int16 = np.frombuffer(data, np.int16)
+                audio_float32 = audio_int16.astype(np.float32) / 32768.0
+                audio_tensor = torch.from_numpy(audio_float32)
+                speech_prob = self.model(audio_tensor, RATE).item()
 
-            if speech_prob > 0.5:
-                if not is_speaking:
-                    is_speaking = True
-                    logger.info("Speech detected. Recording...")
-                last_speech_time = current_time
-            elif is_speaking:
-                pause_duration = current_time - last_speech_time
-                if pause_duration > max_pause and total_duration > min_recording_duration:
-                    logger.info(f"End of speech detected. Total duration: {total_duration:.2f}s")
-                    break
+                current_time = total_duration
+
+                if speech_prob > 0.5:
+                    if not is_speaking:
+                        is_speaking = True
+                        logger.info("Speech detected. Recording...")
+                    last_speech_time = current_time
+                elif is_speaking:
+                    pause_duration = current_time - last_speech_time
+                    if pause_duration > max_pause and total_duration > min_recording_duration:
+                        logger.info(f"End of speech detected. Total duration: {total_duration:.2f}s")
+                        break
+            except ValueError as e:
+                logger.warning(f"Silero VAD error: {e}. Skipping this chunk.")
+                continue
 
             if not is_speaking and total_duration > initial_silence_duration:
                 logger.info("No speech detected. Stopping recording.")
