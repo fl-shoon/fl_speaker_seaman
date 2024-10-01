@@ -94,6 +94,7 @@ class InteractiveRecorder:
         else:
             self.start_stream()
 
+        play_audio(ResponseAudio)
         logging.info("Listening... Speak your question.")
 
         frames = []

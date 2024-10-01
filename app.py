@@ -125,7 +125,6 @@ class VoiceAssistant:
                     '''
                     logger.info("Wake word detected")
                     if self.handle_audio_calibration():
-                        play_audio(ResponseAudio)
                         return True
                     else:
                         logger.info("Calibration failed. Returning to wake word detection.")
