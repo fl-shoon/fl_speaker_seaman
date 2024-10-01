@@ -44,6 +44,8 @@ class InteractiveRecorder:
         '''
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.stream = None
+        self.audio_buffer = []
+        self.buffer_size = 10
         self.beep_file = self.generate_beep_file()
         self.CHUNK_DURATION_MS = 30  
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
