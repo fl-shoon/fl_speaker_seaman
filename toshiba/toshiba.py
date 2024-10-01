@@ -37,6 +37,9 @@ toshiba_vt.VTAPI_getParameter.restype = c_short
 class ToshibaVoiceTrigger:
     def __init__(self, vtdic_path):
         self.vtdic = self._load_vtdic(vtdic_path)
+        print(f"Vtdic size: {len(self.vtdic)}")
+        print(f"Heap size: {self.heap_size}")
+        print(f"Vtdic content (first 100 bytes): {self.vtdic[:100]}")
         self.heap_size, self.frame_size, self.latency, self.num_keywords = self._get_info()
         self.heap = ctypes.create_string_buffer(self.heap_size)
         self.vtapi = POINTER(VTAPIHandle)()
