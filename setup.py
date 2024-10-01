@@ -59,8 +59,6 @@ class RaspberryPiSetup:
             "rx",
             "Pillow",
             "numpy",
-            "torch",
-            "torchaudio",
             "pvporcupine"
         ]
         for package in packages:

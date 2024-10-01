@@ -1,11 +1,13 @@
-import pyaudio, os
+import pyaudio
+import os
 import numpy as np
 import logging
-from typing import Optional
-
+import webrtcvad
+import tempfile
+import wave
 from contextlib import contextmanager
-
 from etc.define import *
+from player import play_audio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,7 +30,7 @@ ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Err
 ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
 
 class InteractiveRecorder:
-    def __init__(self): 
+    def __init__(self, vad_aggressiveness): 
         '''
         VAD aggressiveness
         Increasing the value => less sensitive to background noise
@@ -36,7 +38,9 @@ class InteractiveRecorder:
 
         Decreasing the vlaue => more sensitive to potential speech
         '''
+        self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.stream = None
+        self.beep_file = self.generate_beep_file()
         self.CHUNK_DURATION_MS = 30  
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
 
@@ -63,59 +67,82 @@ class InteractiveRecorder:
             self.stream.close()
         self.p.terminate()
 
-    def is_speech(self, audio_chunk, threshold=500):
-        """Detect speech based on audio energy"""
-        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
-        energy = np.abs(audio_data).mean()
-        return energy > threshold
-    
-    def record_question(self, max_duration: int = 20) -> Optional[bytes]:
+    def record_question(self, silence_threshold, silence_duration, max_duration):
+        '''
+        Silence_threadshold is so low because mic's audio output levels were generally very low.
+        Setting the small value enhances the detection of quieter speech.
+
+        Increasing silence_duration allows more natural pauses in speech.
+        '''
         self.start_stream()
         logger.info("Listening... Speak your question.")
 
         frames = []
+        silent_frames = 0
         is_speaking = False
-        last_speech_time = 0
-        total_duration = 0
-        max_pause = 1.5
-        min_recording_duration = 1.0
-        initial_silence_duration = 3.0
+        speech_frames = 0
+        total_frames = 0
 
-        while total_duration < max_duration:
+        '''
+        Consecutive speech to prevent false starts due to brief noises
+        Here, frame value is too small due to mic's audio output quality.
+        '''
+        consecutive_speech_frames = 2
+
+        '''
+        Initial silence duration to decide to stop recording due to no speech
+        '''
+        initial_silence_duration = 3
+
+        max_silent_frames = int(silence_duration * RATE / self.CHUNK_SIZE) # calculates how many silent chunks correspond to the silence_duration
+
+        while True:
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
             frames.append(data)
-            chunk_duration = len(data) / (RATE * CHANNELS * 2)
-            total_duration += chunk_duration
+            total_frames += 1
 
-            if self.is_speech(data):
-                if not is_speaking:
-                    is_speaking = True
+            audio_chunk = np.frombuffer(data, dtype=np.int16)
+            audio_level = np.abs(audio_chunk).mean() / 32767 
+            '''
+            32767 is the maximum positive value for a 16-bit signed integer
+            calculates the average absolute amplitude of the audio chunk, normalized to a 0-1 range
+            '''  
+
+            try:
+                is_speech = self.vad.is_speech(data, RATE)
+            except Exception as e:
+                logger.error(f"VAD error: {e}")
+                is_speech = False
+
+            logger.debug(f"Frame {total_frames}: Audio level: {audio_level:.4f}, Is speech: {is_speech}")
+
+            if is_speech or audio_level > silence_threshold:
+                speech_frames += 1
+                silent_frames = 0
+                if not is_speaking and speech_frames > consecutive_speech_frames:
                     logger.info("Speech detected. Recording...")
-                last_speech_time = total_duration
-            elif is_speaking:
-                pause_duration = total_duration - last_speech_time
-                if pause_duration > max_pause and total_duration > min_recording_duration:
-                    logger.info(f"End of speech detected. Total duration: {total_duration:.2f}s")
-                    break
-            else:
-                logger.debug("No speech detected.")
+                    is_speaking = True
+            else: 
+                silent_frames += 1
+                speech_frames = max(0, speech_frames - 1)
 
-            if not is_speaking and total_duration > initial_silence_duration:
-                logger.info("Initial silence duration exceeded. Stopping recording.")
+            if is_speaking:
+                if silent_frames > max_silent_frames:
+                    logger.info(f"End of speech detected. Total frames: {total_frames}")
+                    break
+            elif total_frames > initial_silence_duration * RATE / self.CHUNK_SIZE:  
+                logger.info("No speech detected. Stopping recording.")
                 return None
 
+            if total_frames > max_duration * RATE / self.CHUNK_SIZE:
+                logger.info(f"Maximum duration reached. Total frames: {total_frames}")
+                break
+
         self.stop_stream()
-
-        if not is_speaking or total_duration < min_recording_duration:
-            logger.info("No speech detected or recording too short. Returning None.")
-            return None
-
-        logger.info(f"Recording complete. Total duration: {total_duration:.2f}s")
-        self.play_stop_listening_cue()
+        play_audio(self.beep_file)
         return b''.join(frames)
 
-    def play_stop_listening_cue(self):
-        # Generate a simple beep sound
+    def generate_beep_file(self):
         duration = 0.2  # seconds
         frequency = 880  # Hz (A5 note)
         sample_rate = 44100  
@@ -124,15 +151,21 @@ class InteractiveRecorder:
         audio = np.sin(2 * np.pi * frequency * t)
         audio = (audio * 32767).astype(np.int16)
 
-        with suppress_stdout_stderr():
-            stream = self.p.open(format=pyaudio.paInt16,
-                                channels=1,
-                                rate=sample_rate,
-                                output=True)
-            stream.write(audio.tobytes())
-            stream.stop_stream()
-            stream.close()
+        fd, temp_path = tempfile.mkstemp(suffix='.wav')
+        os.close(fd)
 
-def record_audio() -> Optional[bytes]:
-    recorder = InteractiveRecorder()
-    return recorder.record_question()
+        with wave.open(temp_path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(audio.tobytes())
+
+        return temp_path
+
+    def __del__(self):
+        if hasattr(self, 'beep_file') and os.path.exists(self.beep_file):
+            os.remove(self.beep_file)
+            
+def record_audio():
+    recorder = InteractiveRecorder(vad_aggressiveness=3)
+    return recorder.record_question(silence_threshold=0.01, silence_duration=1, max_duration=10)
