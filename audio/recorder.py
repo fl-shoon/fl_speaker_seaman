@@ -140,7 +140,7 @@ class InteractiveRecorder:
                 logging.info(f"Maximum duration reached. Total chunks: {total_chunks}")
                 break
 
-        play_audio(self.beep_file)
+        # play_audio(self.beep_file)
         return b''.join(frames)
 
     def generate_beep_file(self):
