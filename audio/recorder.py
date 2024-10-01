@@ -36,21 +36,15 @@ ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
 
 class InteractiveRecorder:
     def __init__(self, vad_aggressiveness): 
-        '''
-        VAD aggressiveness
-        Increasing the value => less sensitive to background noise
-        But, it can lead to less speech detection performance.
-
-        Decreasing the vlaue => more sensitive to potential speech
-        '''
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.stream = None
-        self.audio_buffer = deque(maxlen=20)  # Increased buffer size
-        self.energy_threshold = None
         self.beep_file = self.generate_beep_file()
-        self.CHUNK_DURATION_MS = 30  
+        self.CHUNK_DURATION_MS = 30
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
         self.CHUNKS_PER_SECOND = 1000 // self.CHUNK_DURATION_MS
+
+        self.audio_buffer = deque(maxlen=20)  
+        self.energy_threshold = None
 
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
