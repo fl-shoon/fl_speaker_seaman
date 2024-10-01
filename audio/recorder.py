@@ -45,6 +45,7 @@ class InteractiveRecorder:
 
         self.audio_buffer = deque(maxlen=20)
         self.energy_threshold = None
+        self.silence_energy = None
 
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
@@ -86,7 +87,7 @@ class InteractiveRecorder:
 
     def calibrate_energy_threshold(self, duration=5):
         logger.info("Calibrating energy threshold. Please remain silent...")
-        self.start_stream()  
+        self.start_stream()
         energy_levels = []
         for _ in range(duration * self.CHUNKS_PER_SECOND):
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -94,14 +95,31 @@ class InteractiveRecorder:
             filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
             energy = np.sum(filtered_audio**2) / len(filtered_audio)
             energy_levels.append(energy)
-        self.energy_threshold = np.mean(energy_levels) * 1.2 
+        
+        self.silence_energy = np.mean(energy_levels)
+        self.energy_threshold = self.silence_energy * 2  # Set threshold to twice the average silence energy
+        logger.info(f"Silence energy: {self.silence_energy}")
         logger.info(f"Energy threshold set to: {self.energy_threshold}")
+
+        # Calibrate for speech
+        logger.info("Now, please speak a few words for calibration...")
+        speech_energy_levels = []
+        for _ in range(3 * self.CHUNKS_PER_SECOND):  # Record for 3 seconds
+            data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
+            audio_chunk = np.frombuffer(data, dtype=np.int16)
+            filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
+            energy = np.sum(filtered_audio**2) / len(filtered_audio)
+            speech_energy_levels.append(energy)
+        
+        max_speech_energy = max(speech_energy_levels)
+        self.energy_threshold = max(self.energy_threshold, max_speech_energy * 0.5)
+        logger.info(f"Adjusted energy threshold: {self.energy_threshold}")
 
     def record_question(self, silence_duration, max_duration):
         if self.energy_threshold is None:
             self.calibrate_energy_threshold()
         else:
-            self.start_stream()  
+            self.start_stream()
 
         logger.info("Listening... Speak your question.")
 
@@ -111,7 +129,7 @@ class InteractiveRecorder:
         speech_chunks = 0
         total_chunks = 0
 
-        consecutive_speech_chunks = 3
+        consecutive_speech_chunks = 5  # Increased from 3 to 5
         initial_silence_chunks = 3 * self.CHUNKS_PER_SECOND
 
         max_silent_chunks = int(silence_duration * self.CHUNKS_PER_SECOND)
@@ -132,7 +150,7 @@ class InteractiveRecorder:
                 is_speech = self.vad.is_speech(data, RATE)
             except Exception as e:
                 logger.error(f"VAD error: {e}")
-                is_speech = energy > self.energy_threshold  
+                is_speech = energy > self.energy_threshold
 
             logger.debug(f"Chunk {total_chunks}: Energy: {energy:.2f}, Average energy: {average_energy:.2f}, Threshold: {self.energy_threshold:.2f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}, Speech chunks: {speech_chunks}")
 
@@ -150,7 +168,7 @@ class InteractiveRecorder:
                 if silent_chunks > max_silent_chunks:
                     logger.info(f"End of speech detected. Total chunks: {total_chunks}")
                     break
-                elif average_energy < self.energy_threshold * 0.8:  
+                elif average_energy < self.silence_energy * 1.2:  # Adjusted to use silence_energy
                     logger.info(f"Sustained low energy detected. Ending recording. Total chunks: {total_chunks}")
                     break
             elif total_chunks > initial_silence_chunks:  
