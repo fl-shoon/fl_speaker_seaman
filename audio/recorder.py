@@ -7,7 +7,7 @@ import tempfile
 import wave
 from contextlib import contextmanager
 from etc.define import *
-from player import play_audio
+from audio.player import play_audio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
