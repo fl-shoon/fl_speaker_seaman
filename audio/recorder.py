@@ -27,9 +27,6 @@ def suppress_stdout_stderr():
         os.dup2(save_stderr, 2)
         os.close(null)
 
-ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Error: {reason}")
-ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
-
 class InteractiveRecorder:
     def __init__(self):
         self.stream = None
@@ -47,7 +44,7 @@ class InteractiveRecorder:
             self.p = pyaudio.PyAudio()
 
     def start_stream(self):
-        if self.stream is None:
+        if self.stream is None or not self.stream.is_active():
             with suppress_stdout_stderr():
                 self.stream = self.p.open(format=pyaudio.paInt16,
                                           channels=CHANNELS,
@@ -56,11 +53,10 @@ class InteractiveRecorder:
                                           frames_per_buffer=self.CHUNK_SIZE)
 
     def stop_stream(self):
-        if self.stream:
+        if self.stream and self.stream.is_active():
             self.stream.stop_stream()
             self.stream.close()
             self.stream = None
-        self.p.terminate()
 
     def butter_lowpass(self, cutoff, fs, order=5):
         nyq = 0.5 * fs
@@ -74,8 +70,7 @@ class InteractiveRecorder:
         return y
 
     def calibrate_energy_threshold(self, duration=5):
-        if self.stream is None:
-            self.start_stream()
+        self.start_stream()
         energy_levels = []
         for _ in range(duration * self.CHUNKS_PER_SECOND):
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
@@ -104,9 +99,6 @@ class InteractiveRecorder:
         max_silent_chunks = int(silence_duration * self.CHUNKS_PER_SECOND)
 
         while True:
-            if self.stream is None:
-                self.start_stream()
-
             data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
             frames.append(data)
             total_chunks += 1
@@ -168,5 +160,8 @@ class InteractiveRecorder:
         return temp_path
 
     def __del__(self):
+        self.stop_stream()
+        if self.p:
+            self.p.terminate()
         if hasattr(self, 'beep_file') and os.path.exists(self.beep_file):
             os.remove(self.beep_file)
