@@ -80,10 +80,11 @@ class InteractiveRecorder:
         is_speaking = False
         last_speech_time = None
         total_duration = 0
-        max_pause = 1.5
-        min_recording_duration = 0.5  # Minimum recording duration in seconds
+        max_pause = 2.0
+        min_recording_duration = 1.0  # Increased minimum recording duration
+        speech_threshold = 0.3  # Lowered speech detection threshold
 
-        initial_silence_duration = 2
+        initial_silence_duration = 3.0  # Increased initial silence duration
         min_chunk_duration = 0.032  # Minimum duration for Silero VAD (32ms)
 
         while total_duration < max_duration:
@@ -103,22 +104,25 @@ class InteractiveRecorder:
 
                 current_time = total_duration
 
-                if speech_prob > 0.5:
+                if speech_prob > speech_threshold:
                     if not is_speaking:
                         is_speaking = True
-                        logger.info("Speech detected. Recording...")
+                        logger.info(f"Speech detected. Recording... (Probability: {speech_prob:.2f})")
                     last_speech_time = current_time
                 elif is_speaking:
                     pause_duration = current_time - last_speech_time
                     if pause_duration > max_pause and total_duration > min_recording_duration:
                         logger.info(f"End of speech detected. Total duration: {total_duration:.2f}s")
                         break
+                else:
+                    logger.debug(f"No speech detected. (Probability: {speech_prob:.2f})")
+
             except ValueError as e:
                 logger.warning(f"Silero VAD error: {e}. Skipping this chunk.")
                 continue
 
             if not is_speaking and total_duration > initial_silence_duration:
-                logger.info("No speech detected. Stopping recording.")
+                logger.info("Initial silence duration exceeded. Stopping recording.")
                 return None
 
         self.stop_stream()
@@ -131,24 +135,24 @@ class InteractiveRecorder:
         self.play_stop_listening_cue()
         return b''.join(frames)
 
-def play_stop_listening_cue(self):
-    # Generate a simple beep sound
-    duration = 0.2  # seconds
-    frequency = 880  # Hz (A5 note)
-    sample_rate = 44100  # standard sample rate
+    def play_stop_listening_cue(self):
+        # Generate a simple beep sound
+        duration = 0.2  # seconds
+        frequency = 880  # Hz (A5 note)
+        sample_rate = 44100  # standard sample rate
 
-    t = np.linspace(0, duration, int(sample_rate * duration), False)
-    audio = np.sin(2 * np.pi * frequency * t)
-    audio = (audio * 32767).astype(np.int16)
+        t = np.linspace(0, duration, int(sample_rate * duration), False)
+        audio = np.sin(2 * np.pi * frequency * t)
+        audio = (audio * 32767).astype(np.int16)
 
-    with suppress_stdout_stderr():
-        stream = self.p.open(format=pyaudio.paInt16,
-                             channels=1,
-                             rate=sample_rate,
-                             output=True)
-        stream.write(audio.tobytes())
-        stream.stop_stream()
-        stream.close()
+        with suppress_stdout_stderr():
+            stream = self.p.open(format=pyaudio.paInt16,
+                                channels=1,
+                                rate=sample_rate,
+                                output=True)
+            stream.write(audio.tobytes())
+            stream.stop_stream()
+            stream.close()
 
 def record_audio() -> Optional[bytes]:
     recorder = InteractiveRecorder()
