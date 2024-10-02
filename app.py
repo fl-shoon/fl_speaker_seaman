@@ -1,26 +1,25 @@
-import argparse
-import logging
-import signal
-import wave
-import time
-import numpy as np
-from threading import Event
-
-from openAI.conversation import OpenAIModule
 from audio.player import sync_audio_and_gif, play_audio
 from audio.recorder import InteractiveRecorder
 from display.show import DisplayModule
+from display.setting import SettingModule
 from etc.define import *
+from openAI.conversation import OpenAIModule
 from pvrecorder import PvRecorder
 from pico.pico import PicoVoiceTrigger
+from threading import Event
 from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
 from transmission.serialModule import SerialModule
 
-# Configure logging
+import argparse
+import logging
+import numpy as np
+import signal
+import time
+import wave
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Global variables
 exit_event = Event()
 
 class VoiceAssistant:
@@ -39,6 +38,7 @@ class VoiceAssistant:
         try:
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
+            # self.settingMenu = Setting
             
             if not self.serial_module.open(USBPort):
                 # FIXME: Send a failure notice post request to server later

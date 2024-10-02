@@ -1,72 +1,64 @@
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
-from serialModule import SerialModule
-from brightness import BrightnessModule
+# from serialModule import SerialModule
+from transmission.serialModule import SerialModule
+# from brightness import BrightnessModule
+# from volume import VolumeModule
+from display.brightness import BrightnessModule
 
-import serial
-import json
-import time
-import logging
-import math
-import io
-import serial.tools.list_ports
+import RPi.GPIO as GPIO 
+import time, io, math, logging, serial.tools.list_ports
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def extract_device():
-    rp2040_port = None
-    pico_arduino_port = None
-    
-    ports = list(serial.tools.list_ports.comports())
-    logger.info(f"Available ports: {ports}")
-    
-    for port, desc, hwid in ports:
-        if "RP2040 LCD 1.28" in desc:
-            rp2040_port = port
-        elif "PicoArduino" in desc:
-            pico_arduino_port = port
-    
-    if rp2040_port is None:
-        logger.warning("RP2040 LCD 1.28 port not found. Defaulting to /dev/ttyACM1")
-        rp2040_port = '/dev/ttyACM1'
-    
-    if pico_arduino_port is None:
-        logger.warning("PicoArduino port not found. Defaulting to /dev/ttyACM0")
-        pico_arduino_port = '/dev/ttyACM0'
-    
-    logger.info(f"Selected RP2040 LCD port: {rp2040_port}")
-    logger.info(f"Selected PicoArduino port: {pico_arduino_port}")
-    
-    return rp2040_port, pico_arduino_port
+    result = '/dev/ttyACM0'
+    ports = [tuple(p) for p in list(serial.tools.list_ports.comports())]
+    logger.info(ports)
+    for device, description, _ in ports:
+        if description == 'RP2040 LCD 1.28 - Board CDC' or 'RP2040' in description or 'LCD' in description:
+            result = device
+    return result  
 
 class SettingModule:
-    def __init__(self, serialModule, baudrate=230400, mcu_port="/dev/ttyACM0"):
-        self.serial_module = serialModule
-        self.input_serial = serial.Serial(mcu_port, baudrate, timeout=1)
-
-        self.background_color = (73, 80, 87)
-        self.text_color = (255, 255, 255)
-        self.highlight_color = (255, 255, 255)
+    def __init__(self, serial_module):
+        self.serial_module = serial_module
+        self.background_color = (73, 80, 87)  # Darker gray for the background
+        self.text_color = (255, 255, 255)  # White for text and icons
+        self.highlight_color = (255, 255, 255)  # Light gray for highlighting
         self.display_size = (240, 240)
         self.highlight_text_color = (0, 0, 0)
         self.icon_size = 24
         self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
         
+        # GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        self.buttons = {
+            'up': 4,
+            'down': 17,
+            'left': 27,
+            'right': 22
+        }
+        for pin in self.buttons.values():
+            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
         self.menu_items = [
-            {'icon': 'volume', 'text': '音量'},
-            {'icon': 'brightness', 'text': '輝度'},
-            {'icon': 'character', 'text': 'キャラ'},
-            {'icon': 'settings', 'text': '設定'},
-            {'icon': 'exit', 'text': '終了'}
+            {'icon': 'volume', 'text': '音量'}, # y-position : 20
+            {'icon': 'brightness', 'text': '輝度'}, # y-position : 60
+            {'icon': 'character', 'text': 'キャラ'}, # y-position : 100
+            {'icon': 'settings', 'text': '設定'}, # y-position : 140
+            {'icon': 'exit', 'text': '終了'} # y-position : 180
         ]
         
-        self.selected_item = 1
+        self.selected_item = 1  # Start with the second item selected (輝度/brightness)
         self.font = self.load_font()
 
-        self.brightness = 1.0
-        self.brightness_control = BrightnessModule(serialModule, self.input_serial, self.brightness)
+        self.brightness = 1.0  # Full brightness
+        self.brightness_control = BrightnessModule(serial_module, self.brightness)
         self.current_menu_image = None
+
+        # self.volume_control = VolumeModule(serial_module, self.brightness)
 
     def load_font(self):
         font_paths = [
@@ -86,57 +78,6 @@ class SettingModule:
         logging.error("Could not load any fonts. Using default font.")
         return ImageFont.load_default()
     
-    def command(self, method, params=None, serial_connection=None):
-        if serial_connection is None:
-            serial_connection = self.input_serial  
-        
-        message = {"method": method}
-        if params:
-            message["params"] = params
-        
-        serial_connection.write(json.dumps(message).encode() + b'\n')
-        response = serial_connection.readline().decode().strip()
-        
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            logger.error(f"Failed to parse response: {response}")
-            return None
-
-    def get_inputs(self):
-        return self.command("getInputs", serial_connection=self.input_serial)
-
-    def check_buttons(self):
-        input_data = self.get_inputs()
-        if input_data and 'result' in input_data:
-            result = input_data['result']
-            buttons = result['buttons']
-
-            if buttons[3]:  # UP button
-                self.selected_item = max(0, self.selected_item - 1)
-                self.update_display()
-                time.sleep(0.2)
-            elif buttons[2]:  # DOWN button
-                self.selected_item = min(len(self.menu_items) - 1, self.selected_item + 1)
-                self.update_display()
-                time.sleep(0.2)
-            elif buttons[1]:  # RIGHT button
-                if self.selected_item == 1:  # Brightness control
-                    self.serial_module.set_current_image(self.current_menu_image)
-                    action, new_brightness = self.brightness_control.run()
-                    if action == 'confirm':
-                        self.brightness = new_brightness
-                        self.serial_module.set_brightness_image(self.brightness)
-                        logger.info(f"Brightness updated to {self.brightness:.2f}")
-                    else:
-                        logger.info("Brightness adjustment cancelled")
-                    self.update_display()
-                time.sleep(0.2)
-            elif buttons[0]:  # LEFT button
-                return 'back'
-
-        return None
-
     def draw_icon(self, draw, icon, position, icon_color=(255, 255, 255)):
         x, y = position
         size = self.icon_size  
@@ -290,19 +231,45 @@ class SettingModule:
 
         self.current_menu_image = image
         
-        # Apply current brightness to the image
-        enhancer = ImageEnhance.Brightness(image)
-        brightened_image = enhancer.enhance(self.brightness)
+        self.serial_module.send_image_data(image)
 
-        # Convert to bytes and send to display
-        img_byte_arr = io.BytesIO()
-        brightened_image.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        self.serial_module.send_image_data(img_byte_arr)
+    def check_buttons(self):
+        if GPIO.input(self.buttons['up']) == GPIO.LOW:
+            self.selected_item = max(0, self.selected_item - 1)
+            self.update_display()
+            time.sleep(0.2)
+        elif GPIO.input(self.buttons['down']) == GPIO.LOW:
+            self.selected_item = min(len(self.menu_items) - 1, self.selected_item + 1)
+            self.update_display()
+            time.sleep(0.2)
+        elif GPIO.input(self.buttons['right']) == GPIO.LOW:
+            if self.selected_item == 1: # Brightness control
+                self.serial_module.set_current_image(self.current_menu_image)  # Ensure current image is set
+                action, new_brightness = self.brightness_control.run()
+                if action == 'confirm':
+                    self.brightness = new_brightness
+                    self.serial_module.set_brightness_image(self.brightness)
+                    logger.info(f"Brightness updated to {self.brightness:.2f}")
+                else:
+                    logger.info("Brightness adjustment cancelled")
+                self.update_display()
+            # elif self.selected_item == 0: # Volume control
+            #     self.serial_module.set_current_image(self.current_menu_image)  # Ensure current image is set
+            #     action, new_brightness = self.volume_control.run()
+            #     if action == 'confirm':
+            #         self.brightness = new_brightness
+            #         self.serial_module.set_brightness_image(self.brightness)
+            #         logger.info(f"Volume updated to {self.brightness:.2f}")
+            #     else:
+            #         logger.info("Volume adjustment cancelled")
+            #     self.update_display()
+            time.sleep(0.2)
+        elif GPIO.input(self.buttons['left']) == GPIO.LOW:
+            return 'back'
 
     def run(self):
         try:
-            self.update_display()
+            self.update_display()  
             while True:
                 action = self.check_buttons()
                 if action == 'back':
@@ -310,25 +277,22 @@ class SettingModule:
                     return 'exit', self.brightness
                 time.sleep(0.1)
         except KeyboardInterrupt:
-            logger.info("Program terminated by user")
+            logger.error("\nProgram terminated by user")
         except Exception as e:
             logger.error(f"An error occurred: {e}")
         finally:
             logger.info("Cleaning up...")
+            GPIO.cleanup()
             logger.info("Sending white frames...")
             self.serial_module.send_white_frames()
-            logger.info("Closing serial connections...")
+            logger.info("Closing serial connection...")
             self.serial_module.close()
-            self.input_serial.close()
             logger.info("Program ended")
 
-if __name__ == "__main__":
-    display_port, mcu_port = extract_device()
-    
-    display_serial = SerialModule()
-    
-    if display_serial.open(display_port):
-        setting_module = SettingModule(serialModule=display_serial, mcu_port=mcu_port)
-        setting_module.run()
-    else:
-        logger.error("Failed to open RP2040 LCD serial port")
+# if __name__ == "__main__":
+#     serial_module = SerialModule()
+#     if serial_module.open(extract_device()):  
+#         ui = SettingModule(serial_module)
+#         ui.run()
+#     else:
+#         logger.info("Failed to open serial port")

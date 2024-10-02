@@ -18,22 +18,6 @@ class OpenAIModule:
     def __del__(self):
         self.executor.shutdown(wait=True)
 
-    def generate_text(self, prompt: str) -> str:
-        response = self.client.completions.create(
-            model="gpt-4",  
-            prompt=prompt,
-            max_tokens=500,
-            temperature=0.75,
-        )
-        return response.choices[0].text.strip()
-
-    def embed_content(self, text: str) -> List[float]:
-        response = self.client.embeddings.create(
-            input=text,
-            model="text-embedding-ada-002"
-        )
-        return response.data[0].embedding
-
     def chat(self, new_message: str) -> str:
         for attempt in range(self.max_retries):
             try:
@@ -108,12 +92,6 @@ class OpenAIModule:
             会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
             ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
         ]
-
-    def get_last_user_message(self):
-        for message in reversed(self.conversation_history):
-            if message["role"] == "user":
-                return message["content"]
-        return ""
 
     def process_audio(self, input_audio_file: str) -> tuple[str, bool]:
         try:
