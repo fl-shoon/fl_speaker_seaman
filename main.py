@@ -115,28 +115,28 @@ class VoiceAssistant:
             if not self.ensure_serial_connection():
                 break
 
-            await self.display.start_listening_display_async(SatoruHappy)
-            audio_data = await asyncio.to_thread(self.interactive_recorder.record_question, silence_duration=1.5, max_duration=30)
-
-            if not audio_data:
-                silence_count += 1
-                if silence_count >= max_silence:
-                    logger.info("Maximum silence reached. Ending conversation.")
-                    conversation_active = False
-                continue
-            else:
-                silence_count = 0
-
-            input_audio_file = AIOutputAudio
-            with wave.open(input_audio_file, 'wb') as wf:
-                wf.setnchannels(CHANNELS)
-                wf.setsampwidth(2)
-                wf.setframerate(RATE)
-                wf.writeframes(audio_data)
-
-            await self.display.stop_listening_display_async()
-
             try:
+                await self.display.start_listening_display_async(SatoruHappy)
+                audio_data = await asyncio.to_thread(self.interactive_recorder.record_question, silence_duration=1.5, max_duration=30)
+
+                if not audio_data:
+                    silence_count += 1
+                    if silence_count >= max_silence:
+                        logger.info("Maximum silence reached. Ending conversation.")
+                        conversation_active = False
+                    continue
+                else:
+                    silence_count = 0
+
+                input_audio_file = AIOutputAudio
+                with wave.open(input_audio_file, 'wb') as wf:
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(2)
+                    wf.setframerate(RATE)
+                    wf.writeframes(audio_data)
+
+                await self.display.stop_listening_display_async()
+
                 # Transcribe audio
                 transcribed_text = await self.ai_client.transcribe_audio(input_audio_file)
                 

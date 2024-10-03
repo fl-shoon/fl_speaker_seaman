@@ -89,7 +89,7 @@ class OpenAIModule:
             )
 
             with open(output_file, "wb") as f:
-                f.write(await response.read())
+                f.write(response.content)
         except OpenAIError as e:
             logging.error(f"Failed to generate speech: {e}")
             self.fallback_text_to_speech(text, output_file)

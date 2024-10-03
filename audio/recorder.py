@@ -75,7 +75,7 @@ class InteractiveRecorder:
         y = lfilter(b, a, data)
         return y
 
-    def calibrate_energy_threshold(self, duration=5):
+    def calibrate_energy_threshold(self, duration=2):
         self.start_stream()
         energy_levels = []
         for _ in range(duration * self.CHUNKS_PER_SECOND):
