@@ -141,12 +141,10 @@ class VoiceAssistant:
                 transcribed_text = await self.ai_client.transcribe_audio(input_audio_file)
                 
                 # Process the transcribed text and stream the response
-                response_chunks = []
+                full_response = ""
                 async for chunk in self.ai_client.chat_async(transcribed_text):
-                    response_chunks.append(chunk)
+                    full_response += chunk
                     # Here you can perform any real-time processing if needed
-                    
-                full_response = ''.join(response_chunks)
                 
                 # Check if the conversation has ended
                 conversation_ended = '[END_OF_CONVERSATION]' in full_response

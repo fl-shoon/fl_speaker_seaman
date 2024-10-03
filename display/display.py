@@ -25,6 +25,7 @@ def suppress_stdout_stderr():
 class DisplayModule:
     def __init__(self, serial_module):
         self.serial_module = serial_module
+        self.stop_event = asyncio.Event()
         os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
         with suppress_stdout_stderr():
             pygame.init()

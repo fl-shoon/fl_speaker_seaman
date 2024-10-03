@@ -89,8 +89,7 @@ class OpenAIModule:
             )
 
             with open(output_file, "wb") as f:
-                async for chunk in response.iter_bytes(chunk_size=4096):
-                    f.write(chunk)
+                f.write(await response.read())
         except OpenAIError as e:
             logging.error(f"Failed to generate speech: {e}")
             self.fallback_text_to_speech(text, output_file)
