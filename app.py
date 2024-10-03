@@ -1,5 +1,6 @@
 from audio.player import sync_audio_and_gif, play_audio
 from audio.recorder import InteractiveRecorder
+from collections import deque
 from display.show import DisplayModule
 from display.setting import SettingModule
 from etc.define import *
@@ -33,6 +34,8 @@ class VoiceAssistant:
         self.ai_client = None
         self.audio_threshold_calibration_done = False
         self.interactive_recorder = InteractiveRecorder()
+        self.calibration_buffer = deque(maxlen=100)  
+        self.energy_levels = deque(maxlen=100)
 
     def initialize(self):
         try:
@@ -85,12 +88,32 @@ class VoiceAssistant:
             return False
         return True
 
+    def update_calibration(self, audio_data):
+        self.calibration_buffer.append(audio_data)
+        chunk = audio_data[:self.interactive_recorder.CHUNK_SIZE]  
+        filtered_audio = self.interactive_recorder.butter_lowpass_filter(chunk, cutoff=1000, fs=RATE)
+        energy = np.sum(filtered_audio**2) / len(filtered_audio)
+        self.energy_levels.append(energy)
+
+    def finalize_calibration(self):
+        if len(self.energy_levels) > 0:
+            self.interactive_recorder.silence_energy = np.mean(self.energy_levels)
+            self.interactive_recorder.energy_threshold = self.interactive_recorder.silence_energy * 2
+            logger.info(f"Calibration complete. Silence energy: {self.interactive_recorder.silence_energy}, Threshold: {self.interactive_recorder.energy_threshold}")
+        else:
+            logger.warning("No energy data available for calibration")
+
     def listen_for_wake_word(self):
         self.recorder.start()
+        self.calibration_buffer.clear()
+        self.energy_levels.clear()
+
         try:
             while not exit_event.is_set():
                 audio_frame = self.recorder.read()
                 audio_data = np.array(audio_frame, dtype=np.int16)
+
+                self.update_calibration(audio_data)
 
                 if self.vt: 
                     detections = self.vt.process(audio_data)
