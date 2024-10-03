@@ -132,11 +132,9 @@ class VoiceAssistant:
                     # logger.info(f"Wake word detected: {detected_keyword}")
                     '''
                     logger.info("Wake word detected")
-                    if self.handle_audio_calibration():
-                        play_audio(ResponseAudio)
-                        return True
-                    else:
-                        logger.info("Calibration failed. Returning to wake word detection.")
+                    self.finalize_calibration()
+                    play_audio(ResponseAudio)
+                    return True
         except Exception as e:
             # FIXME: Handle the error and try to process wake word again
             logger.error(f"Error in wake word detection: {e}")
