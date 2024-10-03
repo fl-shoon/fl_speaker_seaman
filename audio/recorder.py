@@ -45,6 +45,10 @@ class InteractiveRecorder:
         self.silence_energy = None
         # How loud it typically is when someone is speaking
         self.speech_energy = None
+        # Number of chunks to keep for speech detection
+        self.speech_buffer_size = 10  
+        # Multiplier for energy threshold to detect speech
+        self.speech_threshold = 1.2
 
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
@@ -101,6 +105,7 @@ class InteractiveRecorder:
         silent_chunks = 0
         is_speaking = False
         total_chunks = 0
+        speech_energy_buffer = deque(maxlen=self.speech_buffer_size)
 
         max_silent_chunks = int(silence_duration * self.CHUNKS_PER_SECOND)
 
@@ -113,12 +118,10 @@ class InteractiveRecorder:
             filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
             energy = np.sum(filtered_audio**2) / len(filtered_audio)
 
-            self.audio_buffer.append(energy)
-            average_energy = np.mean(self.audio_buffer)
+            speech_energy_buffer.append(energy)
+            average_speech_energy = np.mean(speech_energy_buffer)
 
-            is_speech = energy > self.energy_threshold
-
-            # logging.debug(f"Chunk {total_chunks}: Energy: {energy:.2f}, Average energy: {average_energy:.2f}, Threshold: {self.energy_threshold:.2f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}")
+            is_speech = energy > self.energy_threshold * self.speech_threshold or average_speech_energy > self.energy_threshold
 
             if is_speech:
                 if not is_speaking:
@@ -130,8 +133,12 @@ class InteractiveRecorder:
 
             if is_speaking:
                 if silent_chunks > max_silent_chunks:
-                    logging.info(f"End of speech detected. Total chunks: {total_chunks}")
-                    break
+                    # Check if there's low-energy speech still ongoing
+                    if average_speech_energy > self.energy_threshold * 0.8:
+                        silent_chunks = 0  # Reset silent chunks if low-energy speech detected
+                    else:
+                        logging.info(f"End of speech detected. Total chunks: {total_chunks}")
+                        break
             elif total_chunks > 5 * self.CHUNKS_PER_SECOND:  
                 logging.info("No speech detected. Stopping recording.")
                 self.stop_stream()
