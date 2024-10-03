@@ -2,6 +2,7 @@ from audio.player import sync_audio_and_gif, play_audio
 from audio.recorder import InteractiveRecorder
 from collections import deque
 from display.show import DisplayModule
+# from display.setting import SettingModule
 from etc.define import *
 from openAI.conversation import OpenAIModule
 from pvrecorder import PvRecorder
@@ -31,9 +32,8 @@ class VoiceAssistant:
         self.vt = None
         self.porcupine = None
         self.ai_client = None
-        self.audio_threshold_calibration_done = False
         self.interactive_recorder = InteractiveRecorder()
-        self.calibration_buffer = deque(maxlen=100)  
+        self.calibration_buffer = deque(maxlen=100)  # Adjust maxlen as needed
         self.energy_levels = deque(maxlen=100)
 
     def initialize(self):
@@ -65,14 +65,6 @@ class VoiceAssistant:
             self.cleanup()
             raise
 
-    def handle_audio_calibration(self):
-        if not self.audio_threshold_calibration_done:
-            logger.info("Starting calibration process...")
-            self.interactive_recorder.calibrate_energy_threshold()
-            logger.info("Calibration completed successfully.")
-            self.audio_threshold_calibration_done = True
-        return self.audio_threshold_calibration_done
-
     def ensure_serial_connection(self):
         if not self.serial_module.isPortOpen:
             logger.info("Serial connection closed. Attempting to reopen...")
@@ -88,17 +80,16 @@ class VoiceAssistant:
         return True
 
     def update_calibration(self, audio_data):
-        self.calibration_buffer.append(audio_data)
-        chunk = audio_data[:self.interactive_recorder.CHUNK_SIZE]  
+        chunk = audio_data[:self.interactive_recorder.CHUNK_SIZE]
         filtered_audio = self.interactive_recorder.butter_lowpass_filter(chunk, cutoff=1000, fs=RATE)
         energy = np.sum(filtered_audio**2) / len(filtered_audio)
         self.energy_levels.append(energy)
 
-    def finalize_calibration(self):
+    def perform_calibration(self):
         if len(self.energy_levels) > 0:
             self.interactive_recorder.silence_energy = np.mean(self.energy_levels)
             self.interactive_recorder.energy_threshold = self.interactive_recorder.silence_energy * 2
-            logger.info(f"Calibration complete. Silence energy: {self.interactive_recorder.silence_energy}, Threshold: {self.interactive_recorder.energy_threshold}")
+            logger.info(f"Calibration updated. Silence energy: {self.interactive_recorder.silence_energy}, Threshold: {self.interactive_recorder.energy_threshold}")
         else:
             logger.warning("No energy data available for calibration")
 
@@ -106,6 +97,8 @@ class VoiceAssistant:
         self.recorder.start()
         self.calibration_buffer.clear()
         self.energy_levels.clear()
+        calibration_interval = 50  #50 -> frames
+        frames_since_last_calibration = 0
 
         try:
             while not exit_event.is_set():
@@ -113,6 +106,11 @@ class VoiceAssistant:
                 audio_data = np.array(audio_frame, dtype=np.int16)
 
                 self.update_calibration(audio_data)
+                frames_since_last_calibration += 1
+
+                if frames_since_last_calibration >= calibration_interval:
+                    self.perform_calibration()
+                    frames_since_last_calibration = 0
 
                 if self.vt: 
                     detections = self.vt.process(audio_data)
@@ -122,20 +120,11 @@ class VoiceAssistant:
                     wake_word_triggered = detections >= 0
                 
                 if wake_word_triggered:
-                    '''
-                    All in one operation to both detect 
-                    if a wake word was spoken and 
-                    determine which specific wake word it was
-                    
-                    # detected_keyword = detections.index(max(detections))
-                    # logger.info(f"Wake word detected: {detected_keyword}")
-                    '''
                     logger.info("Wake word detected")
-                    self.finalize_calibration()
                     play_audio(ResponseAudio)
                     return True
+
         except Exception as e:
-            # FIXME: Handle the error and try to process wake word again
             logger.error(f"Error in wake word detection: {e}")
         finally:
             self.recorder.stop()
