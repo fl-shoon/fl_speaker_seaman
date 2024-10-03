@@ -2,7 +2,6 @@ from audio.player import sync_audio_and_gif, play_audio
 from audio.recorder import InteractiveRecorder
 from collections import deque
 from display.show import DisplayModule
-from display.setting import SettingModule
 from etc.define import *
 from openAI.conversation import OpenAIModule
 from pvrecorder import PvRecorder
