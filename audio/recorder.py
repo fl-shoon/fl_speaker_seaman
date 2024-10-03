@@ -31,13 +31,19 @@ class InteractiveRecorder:
     def __init__(self):
         self.stream = None
         self.beep_file = self.generate_beep_file()
-        self.CHUNK_DURATION_MS = 30
+        # How long each chunk should be in time
+        self.CHUNK_DURATION_MS = 30 
+        # Pieces of sound data to be collected in one chunk
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
+        # Number of chunks to be processed in one second
         self.CHUNKS_PER_SECOND = 1000 // self.CHUNK_DURATION_MS
 
-        self.audio_buffer = deque(maxlen=50)  
+        self.audio_buffer = deque(maxlen=50) 
+        # The loudness level above that is considered to be speech 
         self.energy_threshold = None
+        # How long each chunk should be in time
         self.silence_energy = None
+        # How loud it typically is when someone is speaking
         self.speech_energy = None
 
         with suppress_stdout_stderr():
@@ -81,7 +87,7 @@ class InteractiveRecorder:
         
         self.silence_energy = np.mean(energy_levels)
         self.energy_threshold = self.silence_energy * 2 
-        logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
+        # logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
         self.stop_stream()
 
     def record_question(self, silence_duration, max_duration):
@@ -112,7 +118,7 @@ class InteractiveRecorder:
 
             is_speech = energy > self.energy_threshold
 
-            logging.debug(f"Chunk {total_chunks}: Energy: {energy:.2f}, Average energy: {average_energy:.2f}, Threshold: {self.energy_threshold:.2f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}")
+            # logging.debug(f"Chunk {total_chunks}: Energy: {energy:.2f}, Average energy: {average_energy:.2f}, Threshold: {self.energy_threshold:.2f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}")
 
             if is_speech:
                 if not is_speaking:

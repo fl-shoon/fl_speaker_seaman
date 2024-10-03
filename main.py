@@ -1,21 +1,17 @@
-import argparse
-import logging
-import signal
-import wave
-import time
-import asyncio
-import datetime
+import os, logging, time, wave
 import numpy as np
-import firebase_admin
-from threading import Event
-from firebase_admin import credentials, firestore
+import asyncio
+import signal
+import argparse
 
-from openAI.conversation import OpenAIModule
-from audio.player import sync_audio_and_gif, play_audio
-from audio.recorder import record_audio
-from display.show import DisplayModule
+from audio.playAudio import sync_audio_and_gif_async, play_audio
+from audio.recorder import InteractiveRecorder
+from display.display import DisplayModule
 from etc.define import *
+from openAI.chat import OpenAIModule
 from pvrecorder import PvRecorder
+from pico.pico import PicoVoiceTrigger
+from threading import Event
 from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
 from transmission.serialModule import SerialModule
 
@@ -31,7 +27,10 @@ class VoiceAssistant:
         self.display = None
         self.recorder = None
         self.vt = None
+        self.porcupine = None
         self.ai_client = None
+        self.audio_threshold_calibration_done = False
+        self.interactive_recorder = InteractiveRecorder()
 
     def initialize(self):
         try:
@@ -42,16 +41,30 @@ class VoiceAssistant:
                 raise ConnectionError(f"Failed to open serial port {USBPort}")
 
             self.ai_client = OpenAIModule()
-            self.vt = ToshibaVoiceTrigger(self.args.vtdic)
-            self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
-            
-            self.recorder = PvRecorder(frame_length=self.vt.frame_size)
+            try:
+                self.vt = ToshibaVoiceTrigger(self.args.vtdic)
+                self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
+                
+                self.recorder = PvRecorder(frame_length=self.vt.frame_size)
+            except Exception as e:
+                self.vt = None
+                logger.info("Failed to initialize toshiba. Using pico instead")
+                self.porcupine = PicoVoiceTrigger(self.args)
+                self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
             
             logger.info("Voice Assistant initialized successfully")
         except Exception as e:
             logger.error(f"Initialization error: {e}")
             self.cleanup()
             raise
+
+    def handle_audio_calibration(self):
+        if not self.audio_threshold_calibration_done:
+            logger.info("Starting calibration process...")
+            self.interactive_recorder.calibrate_energy_threshold()
+            logger.info("Calibration completed successfully.")
+            self.audio_threshold_calibration_done = True
+        return self.audio_threshold_calibration_done
 
     def ensure_serial_connection(self):
         if not self.serial_module.isPortOpen:
@@ -72,19 +85,28 @@ class VoiceAssistant:
             while not exit_event.is_set():
                 audio_frame = self.recorder.read()
                 audio_data = np.array(audio_frame, dtype=np.int16)
-                detections = self.vt.process(audio_data)
-                if any(detections):
-                    detected_keyword = detections.index(max(detections))
-                    logger.info(f"Wake word detected: {detected_keyword}")
-                    play_audio(ResponseAudio)
-                    return True
+
+                if self.vt: 
+                    detections = self.vt.process(audio_data)
+                    wake_word_triggered = any(detections)
+                else: 
+                    detections = self.porcupine.process(audio_frame)
+                    wake_word_triggered = detections >= 0
+                
+                if wake_word_triggered:
+                    logger.info("Wake word detected")
+                    if self.handle_audio_calibration():
+                        play_audio(ResponseAudio)
+                        return True
+                    else:
+                        logger.info("Calibration failed. Returning to wake word detection.")
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
         finally:
             self.recorder.stop()
         return False
 
-    def process_conversation(self):
+    async def process_conversation(self):
         conversation_active = True
         silence_count = 0
         max_silence = 2
@@ -93,8 +115,8 @@ class VoiceAssistant:
             if not self.ensure_serial_connection():
                 break
 
-            self.display.start_listening_display(SatoruHappy)
-            audio_data = record_audio()
+            await self.display.start_listening_display_async(SatoruHappy)
+            audio_data = await asyncio.to_thread(self.interactive_recorder.record_question, silence_duration=1.5, max_duration=30)
 
             if not audio_data:
                 silence_count += 1
@@ -102,6 +124,8 @@ class VoiceAssistant:
                     logger.info("Maximum silence reached. Ending conversation.")
                     conversation_active = False
                 continue
+            else:
+                silence_count = 0
 
             input_audio_file = AIOutputAudio
             with wave.open(input_audio_file, 'wb') as wf:
@@ -110,35 +134,53 @@ class VoiceAssistant:
                 wf.setframerate(RATE)
                 wf.writeframes(audio_data)
 
-            self.display.stop_listening_display()
+            await self.display.stop_listening_display_async()
 
             try:
-                response_file, conversation_ended = self.ai_client.process_audio(input_audio_file)
-                if response_file:
-                    sync_audio_and_gif(self.display, response_file, SpeakingGif)
-                    if conversation_ended:
-                        conversation_active = False
-                else:
-                    logger.info("No response generated. Ending conversation.")
+                # Transcribe audio
+                transcribed_text = await self.ai_client.transcribe_audio(input_audio_file)
+                
+                # Process the transcribed text and stream the response
+                response_chunks = []
+                async for chunk in self.ai_client.chat_async(transcribed_text):
+                    response_chunks.append(chunk)
+                    # Here you can perform any real-time processing if needed
+                    
+                full_response = ''.join(response_chunks)
+                
+                # Check if the conversation has ended
+                conversation_ended = '[END_OF_CONVERSATION]' in full_response
+                full_response = full_response.replace('[END_OF_CONVERSATION]', '').strip()
+                
+                # Generate speech from the full response
+                response_audio_file = 'temp_response.wav'
+                await self.ai_client.text_to_speech(full_response, response_audio_file)
+                
+                # Play the audio response and show the GIF
+                await sync_audio_and_gif_async(self.display, response_audio_file, SpeakingGif)
+                
+                if conversation_ended:
                     conversation_active = False
+                
             except Exception as e:
                 logger.error(f"Error processing conversation: {e}")
-                error_message = self.ai_client.handle_openai_error(e)
+                error_message = self.ai_client.handle_error(e)
                 error_audio_file = ErrorAudio
-                self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
-                sync_audio_and_gif(self.display, error_audio_file, SpeakingGif)
+                await asyncio.to_thread(self.ai_client.fallback_text_to_speech, error_message, error_audio_file)
+                await sync_audio_and_gif_async(self.display, error_audio_file, SpeakingGif)
                 conversation_active = False
 
-        self.display.fade_in_logo(SeamanLogo)
+        await self.display.display_image_async(SeamanLogo)
+        self.audio_threshold_calibration_done = False
 
-    def run(self):
+    async def run_async(self):
         try:
             self.initialize()
-            self.display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+            await self.display.play_trigger_with_logo_async(TriggerAudio, SeamanLogo)
 
             while not exit_event.is_set():
-                if self.listen_for_wake_word():
-                    self.process_conversation()
+                if await asyncio.to_thread(self.listen_for_wake_word):
+                    await self.process_conversation()
 
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received. Shutting down...")
@@ -146,6 +188,9 @@ class VoiceAssistant:
             logger.error(f"An unexpected error occurred: {e}", exc_info=True)
         finally:
             self.cleanup()
+
+    def run(self):
+        asyncio.run(self.run_async())
 
     def cleanup(self):
         logger.info("Starting cleanup process...")
@@ -158,98 +203,8 @@ class VoiceAssistant:
             self.serial_module.close()
         logger.info("Cleanup process completed.")
 
-class ScheduledVoiceAssistant(VoiceAssistant):
-    def __init__(self, args):
-        super().__init__(args)
-        self.db = None 
-        self.scheduled_time = None
-    
-    def initialize(self):
-        super().initialize()
-        self.init_fire()
-
-    def init_fire(self):
-        cred = credentials.Certificate(FIRE_CRED)
-        firebase_admin.initialize_app(cred)
-        self.db = firestore.client()
-        self.db_ref = self.db.collection('schedulers').document('medicine_reminder_time')
-        self.update_schedule()
-
-    def update_schedule(self):
-        try:
-            self.schedule_data = self.db_ref.get().to_dict()
-            scheduled_hour = self.schedule_data.get('hour')
-            scheduled_minute = self.schedule_data.get('minute')
-            now = datetime.datetime.now()
-            self.scheduled_time = now.replace(hour=scheduled_hour, minute=scheduled_minute, second=0, microsecond=0)
-            if self.scheduled_time <= now:
-                self.scheduled_time += datetime.timedelta(days=1)
-            logger.info(f"Next scheduled time set to: {self.scheduled_time}")
-        except Exception as e:
-            logger.error(f"Error updating schedule: {e}")
-            self.scheduled_time = None
-
-    async def check_schedule(self):
-        while not exit_event.is_set():
-            try:
-                now = datetime.datetime.now()
-                if self.scheduled_time is None:
-                    logger.warning("No scheduled time set. Updating schedule...")
-                    self.update_schedule()
-                    await asyncio.sleep(60)
-                    continue
-
-                time_until_scheduled = (self.scheduled_time - now).total_seconds()
-                
-                if time_until_scheduled <= 0:
-                    logger.info(f"Scheduled time reached. Current time: {now}, Scheduled time: {self.scheduled_time}")
-                    self.update_schedule()  
-                    return True
-                else:
-                    logger.info(f"Waiting for scheduled time. Current time: {now}, Scheduled time: {self.scheduled_time}, Time until scheduled: {time_until_scheduled:.2f} seconds")
-                
-                await asyncio.sleep(60)  
-            except Exception as e:
-                logger.error(f"Error in check_schedule: {e}")
-                await asyncio.sleep(60)
-        return False
-
-    async def run(self):
-        try:
-            self.initialize()
-            self.display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
-
-            while not exit_event.is_set():
-                wake_word_task = asyncio.create_task(self.listen_for_wake_word_async())
-                schedule_task = asyncio.create_task(self.check_schedule())
-
-                done, pending = await asyncio.wait(
-                    [wake_word_task, schedule_task],
-                    return_when=asyncio.FIRST_COMPLETED
-                )
-
-                for task in pending:
-                    task.cancel()
-
-                if wake_word_task in done and wake_word_task.result():
-                    logger.info("Conversation started by wake word.")
-                    self.process_conversation()  
-                elif schedule_task in done and schedule_task.result():
-                    logger.info("Conversation started by schedule.")
-                    self.process_conversation()  
-                else:
-                    logger.warning("No task completed as expected. Restarting loop.")
-
-        except Exception as e:
-            logger.error(f"An unexpected error occurred in run: {e}", exc_info=True)
-        finally:
-            self.cleanup()
-
-    async def listen_for_wake_word_async(self):
-        return await asyncio.to_thread(self.listen_for_wake_word)
-
 def signal_handler(signum, frame):
-    logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
+    logger.info(f"Received {signum} signal. Initiating graceful shutdown...")
     exit_event.set()
 
 if __name__ == '__main__':
@@ -257,12 +212,17 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal_handler)
 
     parser = argparse.ArgumentParser()
+    # Toshiba
     parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
     parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
+    
+    # Pico
+    parser.add_argument('--access_key', help='AccessKey for Porcupine', default=os.environ["PICO_ACCESS_KEY"])
+    parser.add_argument('--keyword_paths', nargs='+', help="Paths to keyword model files", default=[PicoWakeWordSatoru])
+    parser.add_argument('--model_path', help='Path to Porcupine model file', default=PicoLangModel)
+    parser.add_argument('--sensitivities', nargs='+', help="Sensitivities for keywords", type=float, default=[0.5])
+
     args = parser.parse_args()
 
-    # assistant = VoiceAssistant(args)
-    # assistant.run()
-
-    assistant = ScheduledVoiceAssistant(args)
-    asyncio.run(assistant.run())
+    assistant = VoiceAssistant(args)
+    assistant.run()
