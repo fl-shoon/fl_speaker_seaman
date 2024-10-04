@@ -189,6 +189,7 @@ class VoiceAssistant:
 
 def check_inputs(serial_module, setting_menu):
     inputs = serial_module.get_inputs()
+    logger.info(f"inputs received: {inputs}")
     if inputs and 'result' in inputs:
         result = inputs['result']
         buttons = result['buttons']
