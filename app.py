@@ -163,7 +163,7 @@ class VoiceAssistant:
             self.display.stop_listening_display()
 
             try:
-                response_file, conversation_ended = await self.ai_client.stt_gpt_tts_process(input_audio_file)
+                response_file, conversation_ended = await self.ai_client.process_audio(input_audio_file)
                 if response_file:
                     await asyncio.to_thread(sync_audio_and_gif, self.display, response_file, SpeakingGif)
                     if conversation_ended:

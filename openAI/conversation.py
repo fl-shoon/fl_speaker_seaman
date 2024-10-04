@@ -1,34 +1,213 @@
-import os, logging, time, wave, aiohttp, json
-import numpy as np
-from typing import List, Dict
-from openai import OpenAIError
-from etc.define import ErrorAudio
+import os
+import re
+import pygame
+import json
+import logging
+import wave
+import asyncio
+import aiohttp
 from typing import List, Dict, AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
+import numpy as np
+import pyaudio
+import webrtcvad 
+from contextlib import contextmanager
+from pygame import mixer
+from threading import Event
+
+RATE = 16000
+CHANNELS = 1
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class OpenAIModule:
+exit_event = Event()
+
+@contextmanager
+def suppress_stdout_stderr():
+    """A context manager that redirects stdout and stderr to devnull"""
+    try:
+        null = os.open(os.devnull, os.O_RDWR)
+        save_stdout, save_stderr = os.dup(1), os.dup(2)
+        os.dup2(null, 1)
+        os.dup2(null, 2)
+        yield
+    finally:
+        os.dup2(save_stdout, 1)
+        os.dup2(save_stderr, 2)
+        os.close(null)
+
+ERROR_HANDLER_FUNC = lambda type, handle, errno, reason: logger.debug(f"ALSA Error: {reason}")
+ERROR_HANDLER_FUNC_PTR = ERROR_HANDLER_FUNC
+
+class InteractiveRecorder:
+    def __init__(self, vad_aggressiveness): 
+        self.vad = webrtcvad.Vad(vad_aggressiveness)
+        self.stream = None
+        self.CHUNK_DURATION_MS = 30  
+        self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
+
+        self.p = None
+        self.init_pyaudio()
+
+    def init_pyaudio(self):
+        with suppress_stdout_stderr():
+            self.p = pyaudio.PyAudio()
+        try:
+            asound = self.p._lib_pa.pa_get_library_by_name('libasound.so.2')
+            asound.snd_lib_error_set_handler(ERROR_HANDLER_FUNC_PTR)
+        except:
+            logger.warning("Failed to set ALSA error handler")
+
+    def start_stream(self):
+        with suppress_stdout_stderr():
+            self.stream = self.p.open(format=pyaudio.paInt16,
+                                  channels=CHANNELS,
+                                  rate=RATE,
+                                  input=True,
+                                  frames_per_buffer=self.CHUNK_SIZE)
+
+    def stop_stream(self):
+        if self.stream and self.stream.is_active():
+            self.stream.stop_stream()
+            self.stream.close()
+            self.stream = None
+
+    def record_question(self, silence_threshold=0.02, silence_duration=1.5, max_duration=5):
+        self.start_stream()
+        logger.info("Listening... Speak your question.")
+
+        frames = []
+        silent_frames = 0
+        is_speaking = False
+        speech_frames = 0
+        total_frames = 0
+        
+        consecutive_speech_frames = 2
+        initial_silence_duration = 5
+
+        max_silent_frames = int(silence_duration * RATE / self.CHUNK_SIZE) 
+
+        while True:
+            data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
+            frames.append(data)
+            total_frames += 1
+
+            audio_chunk = np.frombuffer(data, dtype=np.int16)
+            audio_level = np.abs(audio_chunk).mean() / 32767 
+
+            try:
+                is_speech = self.vad.is_speech(data, RATE)
+            except Exception as e:
+                logger.error(f"VAD error: {e}")
+                is_speech = False
+
+            if is_speech or audio_level > silence_threshold:
+                speech_frames += 1
+                silent_frames = 0
+                if not is_speaking and speech_frames > consecutive_speech_frames:
+                    logger.info("Speech detected. Recording...")
+                    is_speaking = True
+            else: 
+                silent_frames += 1
+                speech_frames = max(0, speech_frames - 1)
+
+            if is_speaking:
+                if silent_frames > max_silent_frames:
+                    logger.info(f"End of speech detected. Total frames: {total_frames}")
+                    break
+            elif total_frames > initial_silence_duration * RATE / self.CHUNK_SIZE:  
+                logger.info("No speech detected. Stopping recording.")
+                return None
+
+            if total_frames > max_duration * RATE / self.CHUNK_SIZE:
+                logger.info(f"Maximum duration reached. Total frames: {total_frames}")
+                break
+
+        self.stop_stream()
+        return b''.join(frames) 
+
+    def __del__(self):
+        self.stop_stream()
+        if self.p:
+            self.p.terminate()
+
+class AIAssistantService:
+    def __init__(self): 
+        self.interactive_recorder = InteractiveRecorder(vad_aggressiveness=3)
+        self.ai_client = OpenAIClient()
+        os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+        with suppress_stdout_stderr():
+            self.p = pyaudio.PyAudio()
+            pygame.init()
+            mixer.init()
+        self.is_playing = False
+
+    def play_audio(self, filename):
+        with suppress_stdout_stderr():
+            mixer.music.load(filename)
+            mixer.music.play()
+            mixer.music.set_volume(0.5)
+        self.is_playing = True
+        while mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+        self.is_playing = False
+
+    async def process_conversation(self):
+        conversation_active = True
+        silence_count = 0
+        max_silence = 2
+
+        while conversation_active and not exit_event.is_set():
+            while self.is_playing:
+                await asyncio.sleep(0.1)
+
+            await asyncio.sleep(0.5)
+            audio_data = self.interactive_recorder.record_question(silence_duration=1.5, max_duration=30)
+
+            if not audio_data:
+                silence_count += 1
+                if silence_count >= max_silence:
+                    logger.info("Maximum silence reached. Ending conversation.")
+                    conversation_active = False
+                continue
+            else:
+                silence_count = 0
+
+            input_audio_file = 'assets/output.wav'
+            with wave.open(input_audio_file, 'wb') as wf:
+                wf.setnchannels(CHANNELS)
+                wf.setsampwidth(2)
+                wf.setframerate(RATE)
+                wf.writeframes(audio_data)
+
+            try:
+                response_file, conversation_ended = await self.ai_client.process_audio(input_audio_file)
+                if response_file:
+                    await asyncio.to_thread(self.play_audio, response_file)
+                    if conversation_ended:
+                        conversation_active = False
+                else:
+                    logger.info("No response generated. Ending conversation.")
+                    conversation_active = False
+            except Exception as e:
+                logger.error(f"Error processing conversation: {e}")
+                error_message = self.ai_client.handle_openai_error(e)
+                error_audio_file = "assets/error_audio.wav"
+                self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
+                await asyncio.to_thread(self.play_audio, error_audio_file)
+                conversation_active = False
+
+        logger.info("Conversation ended.")
+
+class OpenAIClient:
     def __init__(self):
-        self.executor = ThreadPoolExecutor(max_workers=4)
         self.api_key = os.environ["OPENAI_API_KEY"]
         self.conversation_history: List[Dict[str, str]] = []
         self.max_retries = 3
         self.retry_delay = 5
         self.session = None
-        self.openAIContext = {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
-                        ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
-                        会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
-                        ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
-        self.gptPayload = {
-            "model": "gpt-4",
-            "messages": self.conversation_history,
-            "temperature": 0.75,
-            "max_tokens": 500,
-            "stream": True
-        }
-        self.sttPayload = {"model": "whisper-1", "response_format": "text", "language": "ja"}
+        self.executor = ThreadPoolExecutor(max_workers=4)
 
     async def setup(self):
         self.session = aiohttp.ClientSession()
@@ -38,7 +217,7 @@ class OpenAIModule:
             await self.session.close()
         self.executor.shutdown()
 
-    async def service_openAI(self, endpoint: str, payload: Dict, files: Dict = None) -> AsyncGenerator[bytes, None]:
+    async def stream_api_call(self, endpoint: str, payload: Dict, files: Dict = None) -> AsyncGenerator[bytes, None]:
         headers = {"Authorization": f"Bearer {self.api_key}"}
         url = f"https://api.openai.com/v1/{endpoint}"
 
@@ -56,32 +235,44 @@ class OpenAIModule:
                 async for chunk in response.content.iter_chunks():
                     yield chunk[0]
 
-    async def generate_ai_reply(self, new_message: str) -> AsyncGenerator[str, None]:
+    async def chat(self, new_message: str) -> AsyncGenerator[str, None]:
         if not self.conversation_history:
-            self.conversation_history = [self.openAIContext]
+            self.conversation_history = [
+                {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
+                        ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
+                        会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
+                        ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
+            ]
 
         self.conversation_history.append({"role": "user", "content": new_message})
 
-        ai_response_text = ""
-        response_buffer = ""
+        payload = {
+            "model": "gpt-4",
+            "messages": self.conversation_history,
+            "temperature": 0.75,
+            "max_tokens": 500,
+            "stream": True
+        }
 
-        async for chunk in self.service_openAI("chat/completions", self.gptPayload):
-            response_buffer += chunk.decode('utf-8')
+        full_response = ""
+        buffer = ""
+        async for chunk in self.stream_api_call("chat/completions", payload):
+            buffer += chunk.decode('utf-8')
             while True:
                 try:
-                    split_index = response_buffer.index('\n\n')
-                    line = response_buffer[:split_index].strip()
-                    response_buffer = response_buffer[split_index + 2:]
+                    split_index = buffer.index('\n\n')
+                    line = buffer[:split_index].strip()
+                    buffer = buffer[split_index + 2:]
                     
                     if line.startswith("data: "):
                         if line == "data: [DONE]":
                             break
                         json_str = line[6:] 
                         chunk_data = json.loads(json_str)
-                        response_content = chunk_data['choices'][0]['delta'].get('content', '')
-                        if response_content:
-                            ai_response_text += response_content
-                            yield response_content
+                        content = chunk_data['choices'][0]['delta'].get('content', '')
+                        if content:
+                            full_response += content
+                            yield content
                 except ValueError:  
                     break
                 except json.JSONDecodeError as e:
@@ -89,96 +280,102 @@ class OpenAIModule:
                     logger.error(f"Problematic JSON string: {json_str}")
                     break
 
-        self.conversation_history.append({"role": "assistant", "content": ai_response_text})
+        self.conversation_history.append({"role": "assistant", "content": full_response})
 
         if len(self.conversation_history) > 11:
             self.conversation_history = self.conversation_history[:1] + self.conversation_history[-10:]
 
-    async def speech_to_text(self, audio_file_path: str) -> AsyncGenerator[str, None]:
+    async def transcribe_audio(self, audio_file_path: str) -> AsyncGenerator[str, None]:
         with open(audio_file_path, "rb") as audio_file:
             files = {"file": ("audio.wav", audio_file)}
             payload = {"model": "whisper-1", "response_format": "text", "language": "ja"}
             
-            output_text = ""
-            async for chunk in self.service_openAI("audio/transcriptions", payload, files):
+            full_transcript = ""
+            async for chunk in self.stream_api_call("audio/transcriptions", payload, files):
                 transcript_chunk = chunk.decode('utf-8')
-                output_text += transcript_chunk
+                full_transcript += transcript_chunk
                 yield transcript_chunk
 
-        logger.info(f"Result from STT(speech-to-text): {output_text}")
+        logger.info(f"Full transcript: {full_transcript}")
 
-    async def text_to_speech(self, text: str, output_audio_file: str):
+    async def text_to_speech(self, text: str, output_file: str):
         payload = {"model": "tts-1-hd", "voice": "nova", "input": text, "response_format": "wav"}
         
-        with open(output_audio_file, "wb") as f:
-            async for chunk in self.service_openAI("audio/speech", payload):
+        with open(output_file, "wb") as f:
+            async for chunk in self.stream_api_call("audio/speech", payload):
                 f.write(chunk)
 
-        logger.info(f'Audio content written to file "{output_audio_file}"')
+        logger.info(f'Audio content written to file "{output_file}"')
 
-    async def stt_gpt_tts_process(self, input_audio_file: str) -> tuple[str, bool]:
+    async def process_audio(self, input_audio_file: str) -> tuple[str, bool]:
         try:
             base, ext = os.path.splitext(input_audio_file)
             output_audio_file = f"{base}_response{ext}"
 
             # Transcribe audio (STT)
-            stt_text_result = ""
-            async for transcript_chunk in self.speech_to_text(input_audio_file):
-                stt_text_result += transcript_chunk
+            full_transcript = ""
+            async for transcript_chunk in self.transcribe_audio(input_audio_file):
+                full_transcript += transcript_chunk
 
-            logger.info(f"User's recorded speech text: {stt_text_result}")
+            logger.info(f"Full Transcript: {full_transcript}")
 
             # Generate response (Chat)
-            ai_response_chat = ""
-            async for response_chunk in self.generate_ai_reply(stt_text_result):
-                ai_response_chat += response_chunk
+            full_response = ""
+            async for response_chunk in self.chat(full_transcript):
+                full_response += response_chunk
 
-            conversation_ended = '[END_OF_CONVERSATION]' in ai_response_chat
-            ai_response_chat = ai_response_chat.replace('[END_OF_CONVERSATION]', '').strip()
+            conversation_ended = '[END_OF_CONVERSATION]' in full_response
+            full_response = full_response.replace('[END_OF_CONVERSATION]', '').strip()
 
-            logger.info(f"AI response text: {ai_response_chat}")
+            logger.info(f"AI response: {full_response}")
             logger.info(f"Conversation ended: {conversation_ended}")
 
             # Generate speech (TTS)
-            await self.text_to_speech(ai_response_chat, output_audio_file)
+            await self.text_to_speech(full_response, output_audio_file)
 
             return output_audio_file, conversation_ended
 
         except Exception as e:
             logger.error(f"Error in process_audio: {e}")
             error_message = await self.handle_openai_error(e)
-            output_audio_file = ErrorAudio
+            output_audio_file = "assets/error_audio.wav"
             self.fallback_text_to_speech(error_message, output_audio_file)
             return output_audio_file, True
 
-    def handle_openai_error(self, e: OpenAIError) -> str:
-        if e.code == 'insufficient_quota':
-            logging.error("OpenAI API quota exceeded. Please check your plan and billing details.")
-            return "申し訳ありませんが、システムに一時的な問題が発生しています。後ほど再度お試しください。ただいまシステムを終了します。"
-        elif e.code == 'rate_limit_exceeded':
-            logging.warning(f"Rate limit exceeded. Retrying in {self.retry_delay} seconds...")
-            time.sleep(self.retry_delay)
-            return "少々お待ちください。システムが混み合っています。"
-        else:
-            logging.error(f"OpenAI API error: {e}")
-            return "申し訳ありませんが、エラーが発生しました。ただいまシステムを終了します。"
-        
+    async def handle_openai_error(self, e: Exception) -> str:
+        logger.error(f"OpenAI API error: {e}")
+        return "申し訳ありませんが、エラーが発生しました。"
+
     def fallback_text_to_speech(self, text: str, output_file: str):
-        # Generate a simple beep sound
-        duration = 1  # seconds
-        frequency = 440  # Hz (A4 note)
-        sample_rate = 44100  # standard sample rate
+        duration = 1
+        frequency = 440
+        sample_rate = 44100
 
         t = np.linspace(0, duration, int(sample_rate * duration), False)
         audio = np.sin(2 * np.pi * frequency * t)
         audio = (audio * 32767).astype(np.int16)
 
-        # Write the audio data to a WAV file
         with wave.open(output_file, 'wb') as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
             wf.setframerate(sample_rate)
             wf.writeframes(audio.tobytes())
 
-        logging.warning(f"Fallback TTS used. Original message: {text}")
-        logging.info(f"Fallback audio saved to {output_file}")
+        logger.warning(f"Fallback TTS used. Original message: {text}")
+        logger.info(f"Fallback audio saved to {output_file}")
+
+async def main():
+    assistant = AIAssistantService()
+    await assistant.ai_client.setup()
+    
+    try:
+        while not exit_event.is_set():
+            await assistant.process_conversation()
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Shutting down...")
+        exit_event.set()
+    finally:
+        await assistant.ai_client.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
