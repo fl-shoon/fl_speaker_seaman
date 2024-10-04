@@ -19,6 +19,7 @@ class OpenAIClient:
         self.max_retries = 3
         self.retry_delay = 5
         self.session = None
+        self.audio_player = None
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.gptContext = {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
                         ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。

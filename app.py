@@ -220,7 +220,7 @@ async def main():
     args = parser.parse_args()
 
     assistant = VoiceAssistant(args)
-    aiClient.setAudioPlayer = assistant.audioPlayer
+    aiClient.setAudioPlayer(assistant.audioPlayer)
 
     try:
         assistant.display.play_trigger_with_logo(TriggerAudio, SeamanLogo, assistant.audioPlayer)
