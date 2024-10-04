@@ -96,6 +96,7 @@ class BrightnessModule:
 
     #     return image
 
+    # horizontal bar
     def create_brightness_image(self):
         if self.font is None:
             return None
@@ -104,12 +105,12 @@ class BrightnessModule:
         draw = ImageDraw.Draw(image)
 
         # Draw brightness icon and text
-        icon_size = 28
+        icon_size = 32
         icon_x = self.display_size[0] // 2 - icon_size // 2
-        icon_y = 20
+        icon_y = 50
         self.draw_icon(draw, 'brightness', (icon_x, icon_y))
         
-        small_font = ImageFont.truetype(self.font_path, 18)
+        small_font = ImageFont.truetype(self.font_path, 12)
         text = "輝度"
         text_bbox = draw.textbbox((0, 0), text, font=small_font)
         text_width = text_bbox[2] - text_bbox[0]
@@ -120,7 +121,7 @@ class BrightnessModule:
 
         # Draw horizontal brightness bar
         bar_height = 20
-        bar_width = 160
+        bar_width = 180
         bar_x = (self.display_size[0] - bar_width) // 2
         bar_y = self.display_size[1] // 2 - bar_height // 2
         draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
