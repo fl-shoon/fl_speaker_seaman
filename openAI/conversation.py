@@ -97,9 +97,10 @@ class OpenAIModule:
     async def speech_to_text(self, audio_file_path: str) -> AsyncGenerator[str, None]:
         with open(audio_file_path, "rb") as audio_file:
             files = {"file": ("audio.wav", audio_file)}
+            payload = {"model": "whisper-1", "response_format": "text", "language": "ja"}
             
             output_text = ""
-            async for chunk in self.service_openAI("audio/transcriptions", self.sttPayload, files):
+            async for chunk in self.stream_api_call("audio/transcriptions", payload, files):
                 transcript_chunk = chunk.decode('utf-8')
                 output_text += transcript_chunk
                 yield transcript_chunk
