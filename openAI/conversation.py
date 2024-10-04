@@ -100,7 +100,7 @@ class OpenAIModule:
             payload = {"model": "whisper-1", "response_format": "text", "language": "ja"}
             
             output_text = ""
-            async for chunk in self.stream_api_call("audio/transcriptions", payload, files):
+            async for chunk in self.generate_ai_reply("audio/transcriptions", payload, files):
                 transcript_chunk = chunk.decode('utf-8')
                 output_text += transcript_chunk
                 yield transcript_chunk
