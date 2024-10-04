@@ -18,6 +18,10 @@ class OpenAIClient:
         self.retry_delay = 5
         self.session = None
         self.executor = ThreadPoolExecutor(max_workers=4)
+        self.gptContext = {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
+                        ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
+                        会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
+                        ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
 
     async def setup(self):
         self.session = aiohttp.ClientSession()
@@ -27,7 +31,7 @@ class OpenAIClient:
             await self.session.close()
         self.executor.shutdown()
 
-    async def stream_api_call(self, endpoint: str, payload: Dict, files: Dict = None) -> AsyncGenerator[bytes, None]:
+    async def service_openAI(self, endpoint: str, payload: Dict, files: Dict = None) -> AsyncGenerator[bytes, None]:
         headers = {"Authorization": f"Bearer {self.api_key}"}
         url = f"https://api.openai.com/v1/{endpoint}"
 
@@ -45,14 +49,9 @@ class OpenAIClient:
                 async for chunk in response.content.iter_chunks():
                     yield chunk[0]
 
-    async def chat(self, new_message: str) -> AsyncGenerator[str, None]:
+    async def generate_ai_reply(self, new_message: str) -> AsyncGenerator[str, None]:
         if not self.conversation_history:
-            self.conversation_history = [
-                {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
-                        ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
-                        会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
-                        ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
-            ]
+            self.conversation_history = [self.gptContext]
 
         self.conversation_history.append({"role": "user", "content": new_message})
 
@@ -66,7 +65,7 @@ class OpenAIClient:
 
         full_response = ""
         buffer = ""
-        async for chunk in self.stream_api_call("chat/completions", payload):
+        async for chunk in self.service_openAI("chat/completions", payload):
             buffer += chunk.decode('utf-8')
             while True:
                 try:
@@ -101,7 +100,7 @@ class OpenAIClient:
             payload = {"model": "whisper-1", "response_format": "text", "language": "ja"}
             
             full_transcript = ""
-            async for chunk in self.stream_api_call("audio/transcriptions", payload, files):
+            async for chunk in self.service_openAI("audio/transcriptions", payload, files):
                 transcript_chunk = chunk.decode('utf-8')
                 full_transcript += transcript_chunk
                 yield transcript_chunk
@@ -112,7 +111,7 @@ class OpenAIClient:
         payload = {"model": "tts-1-hd", "voice": "nova", "input": text, "response_format": "wav"}
         
         with open(output_file, "wb") as f:
-            async for chunk in self.stream_api_call("audio/speech", payload):
+            async for chunk in self.service_openAI("audio/speech", payload):
                 f.write(chunk)
 
         logger.info(f'Audio content written to file "{output_file}"')
@@ -131,7 +130,7 @@ class OpenAIClient:
 
             # Generate response (Chat)
             full_response = ""
-            async for response_chunk in self.chat(full_transcript):
+            async for response_chunk in self.generate_ai_reply(full_transcript):
                 full_response += response_chunk
 
             conversation_ended = '[END_OF_CONVERSATION]' in full_response
