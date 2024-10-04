@@ -4,7 +4,7 @@ from collections import deque
 from display.show import DisplayModule
 # from display.setting import SettingModule
 from etc.define import *
-from openAI.conversation import OpenAIModule
+from openAI.chat import OpenAIModule
 from pvrecorder import PvRecorder
 from pico.pico import PicoVoiceTrigger
 from threading import Event
@@ -12,6 +12,7 @@ from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
 from transmission.serialModule import SerialModule
 
 import argparse
+import asyncio
 import logging
 import numpy as np
 import signal
@@ -33,10 +34,11 @@ class VoiceAssistant:
         self.porcupine = None
         self.ai_client = None
         self.interactive_recorder = InteractiveRecorder()
-        self.calibration_buffer = deque(maxlen=100)  # Adjust maxlen as needed
+        self.calibration_buffer = deque(maxlen=100)  
         self.energy_levels = deque(maxlen=100)
+        self.initialize(self.args.aiclient)
 
-    def initialize(self):
+    def initialize(self, aiclient):
         try:
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
@@ -46,7 +48,7 @@ class VoiceAssistant:
                 # FIXME: Send a failure notice post request to server later
                 raise ConnectionError(f"Failed to open serial port {USBPort}")
 
-            self.ai_client = OpenAIModule()
+            self.ai_client = aiclient
             try:
                 self.vt = ToshibaVoiceTrigger(self.args.vtdic)
                 self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
@@ -130,7 +132,7 @@ class VoiceAssistant:
             self.recorder.stop()
         return False
 
-    def process_conversation(self):
+    async def process_conversation(self):
         conversation_active = True
         silence_count = 0
         max_silence = 2
@@ -161,9 +163,9 @@ class VoiceAssistant:
             self.display.stop_listening_display()
 
             try:
-                response_file, conversation_ended = self.ai_client.process_audio(input_audio_file)
+                response_file, conversation_ended = await self.ai_client.process_audio(input_audio_file)
                 if response_file:
-                    sync_audio_and_gif(self.display, response_file, SpeakingGif)
+                    await asyncio.to_thread(self.play_audio, response_file)
                     if conversation_ended:
                         conversation_active = False
                 else:
@@ -179,22 +181,6 @@ class VoiceAssistant:
 
         self.display.fade_in_logo(SeamanLogo)
         self.audio_threadshold_calibration_done = False
-
-    def run(self):
-        try:
-            self.initialize()
-            self.display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
-
-            while not exit_event.is_set():
-                if self.listen_for_wake_word():
-                    self.process_conversation()
-
-        except KeyboardInterrupt:
-            logger.info("KeyboardInterrupt received. Shutting down...")
-        except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-        finally:
-            self.cleanup()
 
     def cleanup(self):
         logger.info("Starting cleanup process...")
@@ -212,6 +198,43 @@ def signal_handler(signum, frame):
     logger.info(f"Received {signum} signal. Initiating graceful shutdown...")
     exit_event.set()
 
+async def main():
+    assistant = OpenAIModule()
+    await assistant.setup()
+
+    parser = argparse.ArgumentParser()
+    # Toshiba
+    parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
+    parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
+    
+    # Pico
+    parser.add_argument('--access_key', help='AccessKey for Porcupine', default=os.environ["PICO_ACCESS_KEY"])
+    parser.add_argument('--keyword_paths', nargs='+', help="Paths to keyword model files", default=[PicoWakeWordSatoru])
+    parser.add_argument('--model_path', help='Path to Porcupine model file', default=PicoLangModel)
+    parser.add_argument('--sensitivities', nargs='+', help="Sensitivities for keywords", type=float, default=[0.5])
+
+    # OpenAi
+    parser.add_argument('--aiclient', help='Asynchronous openAi client', default=assistant)
+
+    args = parser.parse_args()
+
+    assistant = VoiceAssistant(args)
+
+    try:
+        assistant.display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+
+        while not exit_event.is_set():
+            if assistant.listen_for_wake_word():
+                await assistant.process_conversation()
+
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Shutting down...")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+    finally:
+        await assistant.ai_client.close()
+        assistant.cleanup()
+        
 if __name__ == '__main__':
     '''
     Set up a handler for a specific signal
@@ -229,18 +252,4 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
 
-    parser = argparse.ArgumentParser()
-    # Toshiba
-    parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
-    parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
-    
-    # Pico
-    parser.add_argument('--access_key', help='AccessKey for Porcupine', default=os.environ["PICO_ACCESS_KEY"])
-    parser.add_argument('--keyword_paths', nargs='+', help="Paths to keyword model files", default=[PicoWakeWordSatoru])
-    parser.add_argument('--model_path', help='Path to Porcupine model file', default=PicoLangModel)
-    parser.add_argument('--sensitivities', nargs='+', help="Sensitivities for keywords", type=float, default=[0.5])
-
-    args = parser.parse_args()
-
-    assistant = VoiceAssistant(args)
-    assistant.run()
+    asyncio.run(main())

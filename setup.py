@@ -58,7 +58,8 @@ class RaspberryPiSetup:
             "scipy",
             "Pillow",
             "numpy",
-            "pvporcupine"
+            "pvporcupine",
+            "aiohttp"
         ]
         for package in packages:
             if not self.install_package(package):
