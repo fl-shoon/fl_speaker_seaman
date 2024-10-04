@@ -91,7 +91,7 @@ class VoiceAssistant:
         if len(self.energy_levels) > 0:
             self.interactive_recorder.silence_energy = np.mean(self.energy_levels)
             self.interactive_recorder.energy_threshold = self.interactive_recorder.silence_energy * 2
-            logger.info(f"Calibration updated. Silence energy: {self.interactive_recorder.silence_energy}, Threshold: {self.interactive_recorder.energy_threshold}")
+            # logger.info(f"Calibration updated. Silence energy: {self.interactive_recorder.silence_energy}, Threshold: {self.interactive_recorder.energy_threshold}")
         else:
             logger.warning("No energy data available for calibration")
 
