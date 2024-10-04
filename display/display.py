@@ -48,19 +48,7 @@ class DisplayModule:
             self.serial_module.send_image_data(img_byte_arr)
             time.sleep(0.01)
 
-    # def play_trigger_with_logo(self, trigger_audio, logo_path, audio_player):
-    #     audio_player.play_audio(trigger_audio)
-        
-    #     fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
-    #     fade_thread.start()
-
-    #     while mixer.music.get_busy():
-    #         with suppress_stdout_stderr():
-    #             pygame.time.Clock().tick(10)
-
-    #     fade_thread.join()
-
-    def update_gif(self, gif_path, frame_delay=0.1, is_audio_playing=False):
+    def update_gif(self, is_audio_playing, gif_path, frame_delay=0.1):
         frames = self.serial_module.prepare_gif(gif_path)
         all_frames = self.serial_module.precompute_frames(frames)
         
