@@ -8,7 +8,6 @@ from scipy.signal import butter, lfilter
 from contextlib import contextmanager
 from collections import deque
 from etc.define import *
-from audio.player import play_audio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -90,7 +89,7 @@ class InteractiveRecorder:
         # logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
         self.stop_stream()
 
-    def record_question(self, silence_duration, max_duration):
+    def record_question(self, silence_duration, max_duration, audio_player):
         if self.energy_threshold is None:
             return None
 
@@ -141,7 +140,7 @@ class InteractiveRecorder:
                 logging.info(f"Maximum duration reached. Total chunks: {total_chunks}")
                 break
 
-        play_audio(self.beep_file)
+        audio_player.play_audio(self.beep_file)
         self.stop_stream()
         return b''.join(frames)
 

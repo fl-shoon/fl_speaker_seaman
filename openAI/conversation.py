@@ -4,8 +4,10 @@ import wave
 import aiohttp
 from typing import List, Dict, AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
+from etc.define import *
 import numpy as np
 import logging
+import asyncio
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -25,6 +27,9 @@ class OpenAIClient:
 
     async def initialize(self):
         self.session = aiohttp.ClientSession()
+
+    def setAudioPlayer(self, audioPlayer):
+        self.audio_player = audioPlayer
 
     async def close(self):
         if self.session:
@@ -132,6 +137,7 @@ class OpenAIClient:
             # Generate speech (TTS)
             await self.text_to_speech(ai_response_text, output_audio_file)
 
+            await asyncio.to_thread(self.audio_player.sync_audio_and_gif, output_audio_file, SpeakingGif)
             return output_audio_file, conversation_ended
 
         except Exception as e:
@@ -162,3 +168,5 @@ class OpenAIClient:
 
         logger.warning(f"Fallback TTS used. Original message: {text}")
         logger.info(f"Fallback audio saved to {output_file}")
+
+        self.audio_player.sync_audio_and_gif(ErrorAudio, SpeakingGif)

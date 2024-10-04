@@ -3,8 +3,6 @@ from PIL import Image
 from pygame import mixer
 from contextlib import contextmanager
 
-from audio.player import play_audio
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -49,8 +47,8 @@ class DisplayModule:
             self.serial_module.send_image_data(img_byte_arr)
             time.sleep(0.01)
 
-    def play_trigger_with_logo(self, trigger_audio, logo_path):
-        play_audio(trigger_audio)
+    def play_trigger_with_logo(self, trigger_audio, logo_path, audio_player):
+        audio_player.play_audio(trigger_audio)
         
         fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
         fade_thread.start()

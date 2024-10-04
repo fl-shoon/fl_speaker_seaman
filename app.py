@@ -1,4 +1,4 @@
-from audio.player import sync_audio_and_gif, play_audio
+from audio.player import AudioPlayer
 from audio.recorder import InteractiveRecorder
 from collections import deque
 from display.show import DisplayModule
@@ -42,6 +42,7 @@ class VoiceAssistant:
         try:
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
+            self.audioPlayer = AudioPlayer(self.display)
             # self.settingMenu = Setting
             
             if not self.serial_module.open(USBPort):
@@ -123,7 +124,7 @@ class VoiceAssistant:
                 
                 if wake_word_triggered:
                     logger.info("Wake word detected")
-                    play_audio(ResponseAudio)
+                    self.audioPlayer.play_audio(ResponseAudio)
                     return True
 
         except Exception as e:
@@ -142,7 +143,7 @@ class VoiceAssistant:
                 break
 
             self.display.start_listening_display(SatoruHappy)
-            audio_data = self.interactive_recorder.record_question(silence_duration=1.5, max_duration=30)
+            audio_data = self.interactive_recorder.record_question(silence_duration=1.5, max_duration=30, audio_player=self.audioPlayer)
 
             if not audio_data:
                 silence_count += 1
@@ -165,7 +166,7 @@ class VoiceAssistant:
             try:
                 response_file, conversation_ended = await self.ai_client.process_audio(input_audio_file)
                 if response_file:
-                    await asyncio.to_thread(sync_audio_and_gif, self.display, response_file, SpeakingGif)
+                    # await asyncio.to_thread(sync_audio_and_gif, self.display, response_file, SpeakingGif)
                     if conversation_ended:
                         conversation_active = False
                 else:
@@ -176,7 +177,7 @@ class VoiceAssistant:
                 error_message = self.ai_client.handle_openai_error(e)
                 error_audio_file = ErrorAudio
                 self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
-                sync_audio_and_gif(self.display, error_audio_file, SpeakingGif)
+                # sync_audio_and_gif(self.display, error_audio_file, SpeakingGif)
                 conversation_active = False
 
         self.display.fade_in_logo(SeamanLogo)
@@ -199,8 +200,8 @@ def signal_handler(signum, frame):
     exit_event.set()
 
 async def main():
-    assistant = OpenAIClient()
-    await assistant.initialize()
+    aiClient = OpenAIClient()
+    await aiClient.initialize()
 
     parser = argparse.ArgumentParser()
     # Toshiba
@@ -214,14 +215,15 @@ async def main():
     parser.add_argument('--sensitivities', nargs='+', help="Sensitivities for keywords", type=float, default=[0.5])
 
     # OpenAi
-    parser.add_argument('--aiclient', help='Asynchronous openAi client', default=assistant)
+    parser.add_argument('--aiclient', help='Asynchronous openAi client', default=aiClient)
 
     args = parser.parse_args()
 
     assistant = VoiceAssistant(args)
+    aiClient.setAudioPlayer = assistant.audioPlayer
 
     try:
-        assistant.display.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+        assistant.display.play_trigger_with_logo(TriggerAudio, SeamanLogo, assistant.audioPlayer)
 
         while not exit_event.is_set():
             if assistant.listen_for_wake_word():
