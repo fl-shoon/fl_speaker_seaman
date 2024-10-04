@@ -23,7 +23,7 @@ class OpenAIClient:
                         会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
                         ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
 
-    async def setup(self):
+    async def initialize(self):
         self.session = aiohttp.ClientSession()
 
     async def close(self):
@@ -54,24 +54,18 @@ class OpenAIClient:
             self.conversation_history = [self.gptContext]
 
         self.conversation_history.append({"role": "user", "content": new_message})
+        payload = {"model": "gpt-4", "messages": self.conversation_history, "temperature": 0.75, "max_tokens": 500, "stream": True}
 
-        payload = {
-            "model": "gpt-4",
-            "messages": self.conversation_history,
-            "temperature": 0.75,
-            "max_tokens": 500,
-            "stream": True
-        }
-
-        full_response = ""
-        buffer = ""
+        ai_response_text = ""
+        response_buffer = ""
+        
         async for chunk in self.service_openAI("chat/completions", payload):
-            buffer += chunk.decode('utf-8')
+            response_buffer += chunk.decode('utf-8')
             while True:
                 try:
-                    split_index = buffer.index('\n\n')
-                    line = buffer[:split_index].strip()
-                    buffer = buffer[split_index + 2:]
+                    split_index = response_buffer.index('\n\n')
+                    line = response_buffer[:split_index].strip()
+                    response_buffer = response_buffer[split_index + 2:]
                     
                     if line.startswith("data: "):
                         if line == "data: [DONE]":
@@ -80,7 +74,7 @@ class OpenAIClient:
                         chunk_data = json.loads(json_str)
                         content = chunk_data['choices'][0]['delta'].get('content', '')
                         if content:
-                            full_response += content
+                            ai_response_text += content
                             yield content
                 except ValueError:  
                     break
@@ -89,23 +83,23 @@ class OpenAIClient:
                     logger.error(f"Problematic JSON string: {json_str}")
                     break
 
-        self.conversation_history.append({"role": "assistant", "content": full_response})
+        self.conversation_history.append({"role": "assistant", "content": ai_response_text})
 
         if len(self.conversation_history) > 11:
             self.conversation_history = self.conversation_history[:1] + self.conversation_history[-10:]
 
-    async def transcribe_audio(self, audio_file_path: str) -> AsyncGenerator[str, None]:
+    async def speech_to_text(self, audio_file_path: str) -> AsyncGenerator[str, None]:
         with open(audio_file_path, "rb") as audio_file:
             files = {"file": ("audio.wav", audio_file)}
             payload = {"model": "whisper-1", "response_format": "text", "language": "ja"}
             
-            full_transcript = ""
+            response_text = ""
             async for chunk in self.service_openAI("audio/transcriptions", payload, files):
                 transcript_chunk = chunk.decode('utf-8')
-                full_transcript += transcript_chunk
+                response_text += transcript_chunk
                 yield transcript_chunk
 
-        logger.info(f"Full transcript: {full_transcript}")
+        logger.info(f"Result from stt: {response_text}")
 
     async def text_to_speech(self, text: str, output_file: str):
         payload = {"model": "tts-1-hd", "voice": "nova", "input": text, "response_format": "wav"}
@@ -122,25 +116,25 @@ class OpenAIClient:
             output_audio_file = f"{base}_response{ext}"
 
             # Transcribe audio (STT)
-            full_transcript = ""
-            async for transcript_chunk in self.transcribe_audio(input_audio_file):
-                full_transcript += transcript_chunk
+            response_text = ""
+            async for transcript_chunk in self.speech_to_text(input_audio_file):
+                response_text += transcript_chunk
 
-            logger.info(f"Full Transcript: {full_transcript}")
+            logger.info(f"Result from stt: {response_text}")
 
             # Generate response (Chat)
-            full_response = ""
-            async for response_chunk in self.generate_ai_reply(full_transcript):
-                full_response += response_chunk
+            ai_response_text = ""
+            async for response_chunk in self.generate_ai_reply(response_text):
+                ai_response_text += response_chunk
 
-            conversation_ended = '[END_OF_CONVERSATION]' in full_response
-            full_response = full_response.replace('[END_OF_CONVERSATION]', '').strip()
+            conversation_ended = '[END_OF_CONVERSATION]' in ai_response_text
+            ai_response_text = ai_response_text.replace('[END_OF_CONVERSATION]', '').strip()
 
-            logger.info(f"AI response: {full_response}")
+            logger.info(f"AI response: {ai_response_text}")
             logger.info(f"Conversation ended: {conversation_ended}")
 
             # Generate speech (TTS)
-            await self.text_to_speech(full_response, output_audio_file)
+            await self.text_to_speech(ai_response_text, output_audio_file)
 
             return output_audio_file, conversation_ended
 

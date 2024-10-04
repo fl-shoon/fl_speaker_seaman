@@ -200,7 +200,7 @@ def signal_handler(signum, frame):
 
 async def main():
     assistant = OpenAIClient()
-    await assistant.setup()
+    await assistant.initialize()
 
     parser = argparse.ArgumentParser()
     # Toshiba
