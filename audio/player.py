@@ -34,7 +34,7 @@ class AudioPlayer:
     def play_trigger_with_logo(self, trigger_audio, logo_path):
         self.play_audio(trigger_audio)
         
-        fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
+        fade_thread = threading.Thread(target=self.display.fade_in_logo, args=(logo_path,))
         fade_thread.start()
 
         while mixer.music.get_busy():
