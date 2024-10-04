@@ -1,6 +1,5 @@
 from display.brightness import BrightnessModule
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-from transmission.serialModule import SerialModule
 
 import io
 import logging
@@ -11,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class SettingMenu:
-    def __init__(self, serial_module=SerialModule()):
+    def __init__(self, serial_module):
         self.serial_module = serial_module
         self.input_serial = serial_module.input_serial
         
