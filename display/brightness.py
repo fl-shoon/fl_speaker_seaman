@@ -121,7 +121,7 @@ class BrightnessModule:
 
         # Draw horizontal brightness bar
         bar_height = 20
-        bar_width = 180
+        bar_width = 125
         bar_x = (self.display_size[0] - bar_width) // 2
         bar_y = self.display_size[1] // 2 - bar_height // 2
         draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
@@ -138,7 +138,7 @@ class BrightnessModule:
                     fill=self.text_color)
 
         # Draw brightness value in a circle
-        value_size = 25
+        value_size = 28
         value_x = self.display_size[0] // 2
         value_y = bar_y - value_size // 2 - 10
         draw.ellipse([value_x - value_size//2, value_y - value_size//2, 
