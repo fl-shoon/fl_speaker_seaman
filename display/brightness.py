@@ -105,9 +105,9 @@ class BrightnessModule:
         draw = ImageDraw.Draw(image)
 
         # Draw brightness icon and text
-        icon_size = 32
+        icon_size = 28
         icon_x = self.display_size[0] // 2 - icon_size // 2
-        icon_y = 50
+        icon_y = 180
         self.draw_icon(draw, 'brightness', (icon_x, icon_y))
         
         small_font = ImageFont.truetype(self.font_path, 12)
@@ -138,7 +138,7 @@ class BrightnessModule:
                     fill=self.text_color)
 
         # Draw brightness value in a circle
-        value_size = 20
+        value_size = 25
         value_x = self.display_size[0] // 2
         value_y = bar_y - value_size // 2 - 10
         draw.ellipse([value_x - value_size//2, value_y - value_size//2, 
