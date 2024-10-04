@@ -113,8 +113,9 @@ class BrightnessModule:
         text = "輝度"
         text_bbox = draw.textbbox((0, 0), text, font=small_font)
         text_width = text_bbox[2] - text_bbox[0]
-        text_x = icon_x + icon_size + 10
-        text_y = icon_y + (icon_size - text_bbox[3] + text_bbox[1]) // 2
+        text_height = text_bbox[3] - text_bbox[1]
+        text_x = self.display_size[0] // 2 - text_width // 2
+        text_y = icon_y + icon_size + 5
         draw.text((text_x, text_y), text, font=small_font, fill=self.text_color)
 
         # Draw horizontal brightness bar
@@ -137,29 +138,40 @@ class BrightnessModule:
 
         # Draw brightness value in a circle
         value_size = 40
-        value_x = bar_x + bar_width + 20
-        value_y = bar_y + bar_height // 2
-        draw.ellipse([value_x, value_y - value_size//2, value_x + value_size, value_y + value_size//2], fill=self.text_color)
+        value_x = self.display_size[0] // 2
+        value_y = bar_y - value_size // 2 - 10
+        draw.ellipse([value_x - value_size//2, value_y - value_size//2, 
+                      value_x + value_size//2, value_y + value_size//2], fill=self.text_color)
         brightness_percentage = int(self.current_brightness * 100)
         percentage_font = ImageFont.truetype(self.font_path, 18)
         percentage_text = f"{brightness_percentage}"
         text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
-        text_x = value_x + (value_size - text_width) // 2
+        text_x = value_x - text_width // 2
         text_y = value_y - text_height // 2
-        vertical_adjustment = -1  
-        text_y += vertical_adjustment
         draw.text((text_x, text_y), percentage_text, font=percentage_font, fill=self.background_color)
 
         # Draw navigation buttons
-        # draw.polygon([(20, 120), (30, 110), (30, 130)], fill=self.text_color)  # Left arrow
-        # draw.polygon([(220, 120), (210, 110), (210, 130)], fill=self.text_color)  # Right arrow
-        draw.polygon([(120, 180), (110, 190), (130, 190)], fill=self.text_color) # Up
+        draw.polygon([(20, 120), (30, 110), (30, 130)], fill=self.text_color) # Up
         draw.polygon([(120, 220), (110, 210), (130, 210)], fill=self.text_color) # Down
+        
         fixFont = ImageFont.truetype(self.font_path, 12)
-        draw.text((120 - text_width // 2, 195), "戻る", font=fixFont, fill=self.text_color)
-        draw.text((120 - text_width // 2, 225), "決定", font=fixFont, fill=self.text_color)
+        
+        back_text = "戻る"
+        text_bbox = draw.textbbox((0, 0), back_text, font=fixFont)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+        draw.text((35, 120 - text_height // 2), back_text, font=fixFont, fill=self.text_color)
+        # draw.text((120 - text_width // 2, 195), "戻る", font=fixFont, fill=self.text_color)
+        
+        draw.polygon([(220, 120), (210, 110), (210, 130)], fill=self.text_color)  # Right arrow
+        confirm_text = "決定"
+        text_bbox = draw.textbbox((0, 0), confirm_text, font=fixFont)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+        draw.text((205 - text_width, 120 - text_height // 2), confirm_text, font=fixFont, fill=self.text_color)
+        # draw.text((120 - text_width // 2, 225), "決定", font=fixFont, fill=self.text_color)
 
         return image
     
