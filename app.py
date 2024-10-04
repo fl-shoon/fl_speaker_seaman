@@ -103,7 +103,7 @@ class VoiceAssistant:
         calibration_interval = 50  # 50 -> frames
         frames_since_last_calibration = 0
         last_button_check_time = time.time()
-        button_check_interval = 5 # 5 -> check buttons every 5 seconds
+        button_check_interval = 3 # 3 -> check buttons every 5 seconds
 
         try:
             while not exit_event.is_set():
@@ -132,8 +132,8 @@ class VoiceAssistant:
                 current_time = time.time()
                 if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
-                    logger.info(f"response: {res}, brightness: {brightness}")
                     if res == 'exit':
+                        logger.info(f"response: {res}, brightness: {brightness}")
                         self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
                     last_button_check_time = current_time
 
@@ -192,8 +192,6 @@ class VoiceAssistant:
         if inputs and 'result' in inputs:
             result = inputs['result']
             buttons = result['buttons']
-            logger.info(f"result: {result}")
-            logger.info(f"buttons: {buttons}")
 
             if buttons[1]:  # RIGHT button
                 response = self.setting_menu.display_menu()
