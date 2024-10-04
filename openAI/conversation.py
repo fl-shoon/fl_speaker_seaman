@@ -58,7 +58,7 @@ class OpenAIClient:
 
         ai_response_text = ""
         response_buffer = ""
-        
+
         async for chunk in self.service_openAI("chat/completions", payload):
             response_buffer += chunk.decode('utf-8')
             while True:
@@ -93,13 +93,9 @@ class OpenAIClient:
             files = {"file": ("audio.wav", audio_file)}
             payload = {"model": "whisper-1", "response_format": "text", "language": "ja"}
             
-            response_text = ""
             async for chunk in self.service_openAI("audio/transcriptions", payload, files):
                 transcript_chunk = chunk.decode('utf-8')
-                response_text += transcript_chunk
                 yield transcript_chunk
-
-        logger.info(f"Result from stt: {response_text}")
 
     async def text_to_speech(self, text: str, output_file: str):
         payload = {"model": "tts-1-hd", "voice": "nova", "input": text, "response_format": "wav"}
