@@ -250,23 +250,10 @@ class SettingMenu:
         self.serial_module.send_image_data(img_byte_arr)
 
     def display_menu(self):
-        try:
-            self.update_display()
-            while True:
-                action = self.check_inputs()
-                if action == 'back':
-                    logger.info("Returning to main app.")
-                    return 'exit', self.brightness
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            logger.info("Program terminated by user")
-        except Exception as e:
-            logger.error(f"An error occurred: {e}")
-        finally:
-            logger.info("Cleaning up...")
-            logger.info("Sending white frames...")
-            self.serial_module.send_white_frames()
-            logger.info("Closing serial connections...")
-            self.serial_module.close()
-            self.input_serial.close()
-            logger.info("Program ended")
+        self.update_display()
+        while True:
+            action = self.check_inputs()
+            if action == 'back':
+                logger.info("Returning to main app.")
+                return 'exit', self.brightness
+            time.sleep(0.1)

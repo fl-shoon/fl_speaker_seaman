@@ -130,7 +130,8 @@ class VoiceAssistant:
                 else:
                     res, brightness = self.check_buttons()
                     logger.info(f"response: {res}, brightness: {brightness}")
-                    # if res == 'exit':
+                    if res == 'exit':
+                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
