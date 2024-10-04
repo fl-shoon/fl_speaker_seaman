@@ -128,9 +128,8 @@ class VoiceAssistant:
                     return True
                 
                 else:
-                    res, brightness = self.check_inputs()
-                    time.sleep(1)
-                    # logger.info(f"response: {res}, brightness: {brightness}")
+                    res, brightness = self.check_buttons()
+                    logger.info(f"response: {res}, brightness: {brightness}")
                     # if res == 'exit':
 
         except Exception as e:
@@ -183,7 +182,7 @@ class VoiceAssistant:
         self.display.fade_in_logo(SeamanLogo)
         self.audio_threadshold_calibration_done = False
 
-    def check_inputs(self):
+    def check_buttons(self):
         inputs = self.serial_module.get_inputs()
         if inputs and 'result' in inputs:
             result = inputs['result']
@@ -193,9 +192,10 @@ class VoiceAssistant:
 
             if buttons[1]:  # RIGHT button
                 response = self.setting_menu.display_menu()
-                time.sleep(0.2)
                 if response:
                     return response
+                time.sleep(0.2)
+        return None, None
 
     def cleanup(self):
         logger.info("Starting cleanup process...")
