@@ -235,11 +235,10 @@ async def main():
             logger.info(f"wake word triggered? : {wake_word_triggered}")
             if wake_word_triggered:
                 await assistant.process_conversation()
-            else:
-                logger.info('checking inputs')
-                res, brightness = check_inputs(assistant.serial_module, setting_menu)
-                logger.info(f"response: {res}, brightness: {brightness}")
-                # if res == 'exit':
+            logger.info('checking inputs')
+            res, brightness = check_inputs(assistant.serial_module, setting_menu)
+            logger.info(f"response: {res}, brightness: {brightness}")
+            # if res == 'exit':
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Shutting down...")
