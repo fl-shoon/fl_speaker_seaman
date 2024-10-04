@@ -1,7 +1,6 @@
 import time, io, os, logging
-# import threading, time, io, pygame, os, logging
 from PIL import Image
-# from pygame import mixer
+from pygame import mixer
 from contextlib import contextmanager
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,9 +23,6 @@ def suppress_stdout_stderr():
 class DisplayModule:
     def __init__(self, serial_module):
         self.serial_module = serial_module
-        # os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-        # with suppress_stdout_stderr():
-        #     pygame.init()
 
     def fade_in_logo(self, logo_path, steps=7):
         img = Image.open(logo_path)
@@ -48,16 +44,15 @@ class DisplayModule:
             self.serial_module.send_image_data(img_byte_arr)
             time.sleep(0.01)
 
-    def update_gif(self, is_audio_playing, gif_path, frame_delay=0.1):
+    def update_gif(self, gif_path):
         frames = self.serial_module.prepare_gif(gif_path)
         all_frames = self.serial_module.precompute_frames(frames)
         
-        # logger.info(f"Total pre-computed frames: {len(all_frames)}")
         frame_index = 0
-        while is_audio_playing:
+        while mixer.music.get_busy():
             self.serial_module.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
-            time.sleep(frame_delay)
+            time.sleep(0.1)
 
     def display_gif(self, gif_path, stop_event):
         frames = self.serial_module.prepare_gif(gif_path)
