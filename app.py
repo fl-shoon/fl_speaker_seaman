@@ -1,8 +1,8 @@
 from audio.player import AudioPlayer
 from audio.recorder import InteractiveRecorder
 from collections import deque
-from display.show import DisplayModule
-# from display.setting import SettingModule
+from display.display import DisplayModule
+from display.setting import SettingMenu
 from etc.define import *
 from openAI.conversation import OpenAIClient
 from pvrecorder import PvRecorder
@@ -43,7 +43,6 @@ class VoiceAssistant:
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
             self.audioPlayer = AudioPlayer(self.display)
-            # self.settingMenu = Setting
             
             if not self.serial_module.open(USBPort):
                 # FIXME: Send a failure notice post request to server later
@@ -188,6 +187,16 @@ class VoiceAssistant:
             self.serial_module.close()
         logger.info("Cleanup process completed.")
 
+def check_inputs(serial_module, setting_menu):
+    inputs = serial_module.get_inputs()
+    if inputs and 'result' in inputs:
+        result = inputs['result']
+        buttons = result['buttons']
+
+        if buttons[1]:  # RIGHT button
+            setting_menu.display_menu()
+            time.sleep(0.2)
+
 def signal_handler(signum, frame):
     # Handle the signals when either signal is received
     logger.info(f"Received {signum} signal. Initiating graceful shutdown...")
@@ -215,6 +224,7 @@ async def main():
 
     assistant = VoiceAssistant(args)
     aiClient.setAudioPlayer(assistant.audioPlayer)
+    setting_menu = SettingMenu(assistant.serial_module)
 
     try:
         assistant.display.play_trigger_with_logo(TriggerAudio, SeamanLogo, assistant.audioPlayer)
@@ -222,6 +232,10 @@ async def main():
         while not exit_event.is_set():
             if assistant.listen_for_wake_word():
                 await assistant.process_conversation()
+            else:
+                res, brightness = check_inputs(assistant.serial_module, setting_menu)
+                logger.info(f"response: {res}, brightness: {brightness}")
+                # if res == 'exit':
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Shutting down...")

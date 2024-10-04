@@ -1,9 +1,7 @@
-import threading, time, io, pygame, os, logging, asyncio
+import threading, time, io, pygame, os, logging
 from PIL import Image
 from pygame import mixer
 from contextlib import contextmanager
-
-from audio.playAudio import play_audio, play_audio_async
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -25,7 +23,6 @@ def suppress_stdout_stderr():
 class DisplayModule:
     def __init__(self, serial_module):
         self.serial_module = serial_module
-        self.stop_event = asyncio.Event()
         os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
         with suppress_stdout_stderr():
             pygame.init()
@@ -50,8 +47,8 @@ class DisplayModule:
             self.serial_module.send_image_data(img_byte_arr)
             time.sleep(0.01)
 
-    def play_trigger_with_logo(self, trigger_audio, logo_path):
-        play_audio(trigger_audio)
+    def play_trigger_with_logo(self, trigger_audio, logo_path, audio_player):
+        audio_player.play_audio(trigger_audio)
         
         fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
         fade_thread.start()
@@ -62,29 +59,16 @@ class DisplayModule:
 
         fade_thread.join()
 
-    async def play_trigger_with_logo_async(self, trigger_audio, logo_path):
-        await play_audio_async(trigger_audio)
-        await asyncio.to_thread(self.fade_in_logo, logo_path)
-
     def update_gif(self, gif_path, frame_delay=0.1):
         frames = self.serial_module.prepare_gif(gif_path)
         all_frames = self.serial_module.precompute_frames(frames)
+        
+        # logger.info(f"Total pre-computed frames: {len(all_frames)}")
         frame_index = 0
-        self.stop_event.clear()
-        while not self.stop_event.is_set():
+        while mixer.music.get_busy():
             self.serial_module.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(frame_delay)
-
-    async def update_gif_async(self, gif_path, frame_delay=0.1):
-        frames = self.serial_module.prepare_gif(gif_path)
-        all_frames = self.serial_module.precompute_frames(frames)
-        frame_index = 0
-        self.stop_event.clear()
-        while not self.stop_event.is_set():
-            await asyncio.to_thread(self.serial_module.send_image_data, all_frames[frame_index])
-            frame_index = (frame_index + 1) % len(all_frames)
-            await asyncio.sleep(frame_delay)
 
     def display_gif(self, gif_path, stop_event):
         frames = self.serial_module.prepare_gif(gif_path)
@@ -97,38 +81,41 @@ class DisplayModule:
 
     def display_image(self, image_path):
         try:
+            # logger.info(f"Opening image: {image_path}")
             img = Image.open(image_path)
+            width, height = img.size
+            # logger.info(f"Image size: {width}x{height}")
+
+            # Convert image to RGB mode if it's not already
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            if img.size != (240, 240):
+
+            if (width, height) != (240, 240):
                 img = img.resize((240, 240))
+                # logger.info("Image resized to 240x240")
+
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
+
+            # logger.info("Sending image to display...")
             self.serial_module.send_image_data(img_byte_arr)
+            # logger.info("Image sent to display")
+
         except Exception as e:
             logger.warning(f"Error in display_image: {e}")
-
-    async def display_image_async(self, image_path):
-        await asyncio.to_thread(self.display_image, image_path)
 
     def start_listening_display(self, image_path):
         self.display_image(image_path)
 
-    async def start_listening_display_async(self, image_path):
-        await self.display_image_async(image_path)
-
     def stop_listening_display(self):
-        self.send_white_frames()
-
-    async def stop_listening_display_async(self):
-        await self.send_white_frames_async()
+        self.serial_module.send_white_frames()
 
     def stop_animation(self):
-        self.stop_event.set()
+        if hasattr(self, 'stop_event'):
+            self.stop_event.set()
+            self.display_thread.join()
+        self.serial_module.send_white_frames()
 
     def send_white_frames(self):
         self.serial_module.send_white_frames()
-
-    async def send_white_frames_async(self):
-        await asyncio.to_thread(self.serial_module.send_white_frames)

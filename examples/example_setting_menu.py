@@ -1,20 +1,50 @@
-from display.brightness import BrightnessModule
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-from transmission.serialModule import SerialModule
 
-import io
+from serialModule import SerialModule
+from brightness import BrightnessModule
+
+import serial
+import json
+import time
 import logging
 import math
-import time
+import io
+import serial.tools.list_ports
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class SettingMenu:
-    def __init__(self, serial_module=SerialModule()):
-        self.serial_module = serial_module
-        self.input_serial = serial_module.input_serial
-        
+def extract_device():
+    rp2040_port = None
+    pico_arduino_port = None
+    
+    ports = list(serial.tools.list_ports.comports())
+    logger.info(f"Available ports: {ports}")
+    
+    for port, desc, hwid in ports:
+        if "RP2040 LCD 1.28" in desc:
+            rp2040_port = port
+        elif "PicoArduino" in desc:
+            pico_arduino_port = port
+    
+    if rp2040_port is None:
+        logger.warning("RP2040 LCD 1.28 port not found. Defaulting to /dev/ttyACM1")
+        rp2040_port = '/dev/ttyACM1'
+    
+    if pico_arduino_port is None:
+        logger.warning("PicoArduino port not found. Defaulting to /dev/ttyACM0")
+        pico_arduino_port = '/dev/ttyACM0'
+    
+    logger.info(f"Selected RP2040 LCD port: {rp2040_port}")
+    logger.info(f"Selected PicoArduino port: {pico_arduino_port}")
+    
+    return rp2040_port, pico_arduino_port
+
+class SettingModule:
+    def __init__(self, serialModule, baudrate=230400, mcu_port="/dev/ttyACM0"):
+        self.serial_module = serialModule
+        self.input_serial = serial.Serial(mcu_port, baudrate, timeout=1)
+
         self.background_color = (73, 80, 87)
         self.text_color = (255, 255, 255)
         self.highlight_color = (255, 255, 255)
@@ -35,7 +65,7 @@ class SettingMenu:
         self.font = self.load_font()
 
         self.brightness = 1.0
-        self.brightness_control = BrightnessModule(serial_module, self.input_serial, self.brightness)
+        self.brightness_control = BrightnessModule(serialModule, self.input_serial, self.brightness)
         self.current_menu_image = None
 
     def load_font(self):
@@ -56,10 +86,30 @@ class SettingMenu:
         logging.error("Could not load any fonts. Using default font.")
         return ImageFont.load_default()
     
-    def check_inputs(self):
-        inputs = self.serial_module.get_inputs()
-        if inputs and 'result' in inputs:
-            result = inputs['result']
+    def command(self, method, params=None, serial_connection=None):
+        if serial_connection is None:
+            serial_connection = self.input_serial  
+        
+        message = {"method": method}
+        if params:
+            message["params"] = params
+        
+        serial_connection.write(json.dumps(message).encode() + b'\n')
+        response = serial_connection.readline().decode().strip()
+        
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse response: {response}")
+            return None
+
+    def get_inputs(self):
+        return self.command("getInputs", serial_connection=self.input_serial)
+
+    def check_buttons(self):
+        input_data = self.get_inputs()
+        if input_data and 'result' in input_data:
+            result = input_data['result']
             buttons = result['buttons']
 
             if buttons[3]:  # UP button
@@ -215,7 +265,7 @@ class SettingMenu:
             draw.line([x+size*0.17, y+size*0.83, x+size*0.83, y+size*0.17], fill=icon_color, width=3)
 
     def update_display(self):
-        # Create setting menu
+        # Create a base image
         image = Image.new('RGB', self.display_size, self.background_color)
         draw = ImageDraw.Draw(image)
 
@@ -250,11 +300,11 @@ class SettingMenu:
         img_byte_arr = img_byte_arr.getvalue()
         self.serial_module.send_image_data(img_byte_arr)
 
-    def display_menu(self):
+    def run(self):
         try:
             self.update_display()
             while True:
-                action = self.check_inputs()
+                action = self.check_buttons()
                 if action == 'back':
                     logger.info("Returning to main app.")
                     return 'exit', self.brightness
@@ -271,3 +321,14 @@ class SettingMenu:
             self.serial_module.close()
             self.input_serial.close()
             logger.info("Program ended")
+
+if __name__ == "__main__":
+    display_port, mcu_port = extract_device()
+    
+    display_serial = SerialModule()
+    
+    if display_serial.open(display_port):
+        setting_module = SettingModule(serialModule=display_serial, mcu_port=mcu_port)
+        setting_module.run()
+    else:
+        logger.error("Failed to open RP2040 LCD serial port")

@@ -85,12 +85,29 @@ BautRate = '230400'
 
 # finding lcd display's device name
 def extract_device():
-    result = '/dev/ttyACM0'
-    ports = [tuple(p) for p in list(serial.tools.list_ports.comports())]
-    logger.info(ports)
-    for device, description, _ in ports:
-        if description == 'RP2040 LCD 1.28 - Board CDC' or 'RP2040' in description or 'LCD' in description:
-            result =  device
-    return result 
+    rp2040_port = None
+    pico_arduino_port = None
+    
+    ports = list(serial.tools.list_ports.comports())
+    logger.info(f"Available ports: {ports}")
+    
+    for port, desc, hwid in ports:
+        if "RP2040 LCD 1.28" in desc:
+            rp2040_port = port
+        elif "PicoArduino" in desc:
+            pico_arduino_port = port
+    
+    if rp2040_port is None:
+        logger.warning("RP2040 LCD 1.28 port not found. Defaulting to /dev/ttyACM1")
+        rp2040_port = '/dev/ttyACM1'
+    
+    if pico_arduino_port is None:
+        logger.warning("PicoArduino port not found. Defaulting to /dev/ttyACM0")
+        pico_arduino_port = '/dev/ttyACM0'
+    
+    logger.info(f"Selected RP2040 LCD port: {rp2040_port}")
+    logger.info(f"Selected PicoArduino port: {pico_arduino_port}")
+    
+    return rp2040_port, pico_arduino_port 
 
-USBPort = extract_device()
+USBPort, MCUPort = extract_device()

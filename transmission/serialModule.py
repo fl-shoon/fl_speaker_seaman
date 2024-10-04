@@ -1,6 +1,7 @@
-import serial, time, io, logging
+import serial, time, io, logging, json
 from PIL import Image, ImageEnhance
 import numpy as np
+from etc.define import *
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ class SerialModule:
         self.comm = None
         self.current_brightness = 1.0  
         self.current_image = None
+        self.input_serial = serial.Serial(MCUPort, BautRate, timeout=1)
 
     def open(self, tty):
         try:
@@ -23,8 +25,27 @@ class SerialModule:
             logger.warning(f"Failed to open port: {e}")
         return self.isPortOpen
 
+    def sendCommand(self, method, params=None):
+        serial_connection = self.input_serial  
+        
+        message = {"method": method}
+        if params:
+            message["params"] = params
+        
+        serial_connection.write(json.dumps(message).encode() + b'\n')
+        response = serial_connection.readline().decode().strip()
+        
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse response: {response}")
+            return None
+
     def send(self, data):
         self.comm.write(data)
+
+    def get_inputs(self):
+        return self.sendCommand("getInputs", serial_connection=self.input_serial)
 
     def send_text(self):
         self.send('test'.encode())
@@ -102,54 +123,49 @@ class SerialModule:
             
             time.sleep(0.05) 
 
-    def send_white_frames(self, flash_delay=0.05, max_retries=3, timeout=5):
+    def send_white_frames(self, flash_delay=0.01, timeout=2):
         white_frame = np.full((240, 240, 3), 255, dtype=np.uint8)
         white_frame_bytes = self.frame_to_bytes(white_frame)
         # logger.info(f"Prepared white frame, size: {len(white_frame_bytes)} bytes")
 
-        for attempt in range(max_retries):
-            try:
-                # logger.info(f"Attempt {attempt + 1}/{max_retries} to send white frame")
-                start_time = time.time()
-                
-                # Clear any existing data in the serial buffer
-                self.comm.reset_input_buffer()
-                self.comm.reset_output_buffer()
-                
-                # Send a small test message
-                self.comm.write(b'TEST')
+        try:
+            # logger.info(f"Attempt {attempt + 1}/{max_retries} to send white frame")
+            start_time = time.time()
+            
+            # Clear any existing data in the serial buffer
+            self.comm.reset_input_buffer()
+            self.comm.reset_output_buffer()
+            
+            # Send a small test message
+            self.comm.write(b'TEST')
+            time.sleep(0.1)
+            response = self.comm.read_all()
+            # logger.info(f"Test message response: {response}")
+
+            # Send the actual white frame data
+            bytes_written = self.comm.write(white_frame_bytes)
+            self.comm.flush()
+            # logger.info(f"Bytes written: {bytes_written}")
+
+            # Wait for acknowledgment with timeout
+            ack_received = False
+            while time.time() - start_time < timeout:
+                if self.comm.in_waiting:
+                    ack = self.comm.read_all()
+                    # logger.info(f"Received acknowledgment: {ack}")
+                    ack_received = True
+                    break
                 time.sleep(0.1)
-                response = self.comm.read_all()
-                # logger.info(f"Test message response: {response}")
 
-                # Send the actual white frame data
-                bytes_written = self.comm.write(white_frame_bytes)
-                self.comm.flush()
-                # logger.info(f"Bytes written: {bytes_written}")
+            if ack_received:
+                logger.info("Turned screen to white successfully")
+                time.sleep(flash_delay)
+                return True
+            else:
+                logger.info(f"Failed to turn screen into white within {timeout} seconds")
 
-                # Wait for acknowledgment with timeout
-                ack_received = False
-                while time.time() - start_time < timeout:
-                    if self.comm.in_waiting:
-                        ack = self.comm.read_all()
-                        # logger.info(f"Received acknowledgment: {ack}")
-                        ack_received = True
-                        break
-                    time.sleep(0.1)
-
-                if ack_received:
-                    logger.info("Turned screen to white successfully")
-                    time.sleep(flash_delay)
-                    return True
-                else:
-                    logger.info(f"Failed to turn screen into white within {timeout} seconds")
-
-            except Exception as e:
-                logger.warning(f"Error in turning white screen: {str(e)}")
-
-            if attempt < max_retries - 1:
-                logger.info("Retrying...")
-                time.sleep(1)
+        except Exception as e:
+            logger.warning(f"Error in turning white screen: {str(e)}")
 
         logger.warning("Failed to send white frames after all retries")
         return False
@@ -255,5 +271,6 @@ class SerialModule:
     def close(self):
         if self.isPortOpen and self.comm is not None:
             self.comm.close()
+            self.input_serial.close()
             self.isPortOpen = False
             logger.info("Serial connection closed")
