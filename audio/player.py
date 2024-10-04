@@ -24,6 +24,7 @@ class AudioPlayer:
         with suppress_stdout_stderr():
             pygame.init()
             mixer.init()
+        self.is_playing = mixer.music.get_busy()
 
     def play_audio(self, filename):
         with suppress_stdout_stderr():
@@ -46,7 +47,7 @@ class AudioPlayer:
     def sync_audio_and_gif(self, audio_file, gif_path):
         self.play_audio(audio_file)
         
-        gif_thread = threading.Thread(target=self.display.update_gif, args=(gif_path,))
+        gif_thread = threading.Thread(target=self.display.update_gif, args=(gif_path,self.is_playing,))
         gif_thread.start()
 
         clock = pygame.time.Clock()
