@@ -104,23 +104,23 @@ class BrightnessModule:
         draw = ImageDraw.Draw(image)
 
         # Draw brightness icon and text
-        icon_size = 32
-        icon_x = 20
-        icon_y = self.display_size[1] // 2 - icon_size // 2
+        icon_size = 28
+        icon_x = self.display_size[0] // 2 - icon_size // 2
+        icon_y = 20
         self.draw_icon(draw, 'brightness', (icon_x, icon_y))
         
-        small_font = ImageFont.truetype(self.font_path, 18)
+        small_font = ImageFont.truetype(self.font_path, 16)
         text = "輝度"
         text_bbox = draw.textbbox((0, 0), text, font=small_font)
         text_width = text_bbox[2] - text_bbox[0]
-        text_x = icon_x + icon_size + 10
-        text_y = icon_y + (icon_size - text_bbox[3] + text_bbox[1]) // 2
+        text_x = self.display_size[0] // 2 - text_width // 2
+        text_y = icon_y + icon_size + 5
         draw.text((text_x, text_y), text, font=small_font, fill=self.text_color)
 
-        # Draw horizontal brightness bar
-        bar_height = 30
-        bar_width = 140
-        bar_x = 70
+        # Draw horizontal brightness bar (thinner)
+        bar_height = 20
+        bar_width = 160
+        bar_x = (self.display_size[0] - bar_width) // 2
         bar_y = self.display_size[1] // 2 - bar_height // 2
         draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
         filled_width = int(bar_width * self.current_brightness)
@@ -128,7 +128,7 @@ class BrightnessModule:
 
         # Draw vertical slider bar
         slider_width = 4
-        slider_height = 40
+        slider_height = 30
         slider_x = bar_x + filled_width - slider_width // 2
         slider_y = bar_y - (slider_height - bar_height) // 2
         draw.rectangle([slider_x, slider_y, 
@@ -136,28 +136,35 @@ class BrightnessModule:
                     fill=self.text_color)
 
         # Draw brightness value in a circle
-        value_size = 40
+        value_size = 36
         value_x = bar_x + bar_width + 20
         value_y = bar_y + bar_height // 2
         draw.ellipse([value_x, value_y - value_size//2, value_x + value_size, value_y + value_size//2], fill=self.text_color)
         brightness_percentage = int(self.current_brightness * 100)
-        percentage_font = ImageFont.truetype(self.font_path, 18)
+        percentage_font = ImageFont.truetype(self.font_path, 16)
         percentage_text = f"{brightness_percentage}"
         text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
         text_x = value_x + (value_size - text_width) // 2
         text_y = value_y - text_height // 2
-        vertical_adjustment = -1  
-        text_y += vertical_adjustment
         draw.text((text_x, text_y), percentage_text, font=percentage_font, fill=self.background_color)
 
-        # Draw navigation buttons
-        draw.polygon([(20, 120), (30, 110), (30, 130)], fill=self.text_color)  # Left arrow
-        draw.polygon([(220, 120), (210, 110), (210, 130)], fill=self.text_color)  # Right arrow
-        fixFont = ImageFont.truetype(self.font_path, 12)
-        draw.text((20, 135), "戻る", font=fixFont, fill=self.text_color)
-        draw.text((200, 135), "決定", font=fixFont, fill=self.text_color)
+        nav_font = ImageFont.truetype(self.font_path, 12)
+        
+        # Up arrow and text
+        draw.polygon([(120, 180), (110, 190), (130, 190)], fill=self.text_color)
+        up_text = "上げる"
+        text_bbox = draw.textbbox((0, 0), up_text, font=nav_font)
+        text_width = text_bbox[2] - text_bbox[0]
+        draw.text((120 - text_width // 2, 195), up_text, font=nav_font, fill=self.text_color)
+        
+        # Down arrow and text
+        draw.polygon([(120, 220), (110, 210), (130, 210)], fill=self.text_color)
+        down_text = "下げる"
+        text_bbox = draw.textbbox((0, 0), down_text, font=nav_font)
+        text_width = text_bbox[2] - text_bbox[0]
+        draw.text((120 - text_width // 2, 225), down_text, font=nav_font, fill=self.text_color)
 
         return image
     
