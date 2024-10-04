@@ -4,7 +4,7 @@ from collections import deque
 from display.show import DisplayModule
 # from display.setting import SettingModule
 from etc.define import *
-from openAI.conversation import OpenAIModule
+from openAI.conversation import OpenAIClient
 from pvrecorder import PvRecorder
 from pico.pico import PicoVoiceTrigger
 from threading import Event
@@ -199,7 +199,7 @@ def signal_handler(signum, frame):
     exit_event.set()
 
 async def main():
-    assistant = OpenAIModule()
+    assistant = OpenAIClient()
     await assistant.setup()
 
     parser = argparse.ArgumentParser()
