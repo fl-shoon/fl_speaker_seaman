@@ -100,8 +100,10 @@ class VoiceAssistant:
         self.recorder.start()
         self.calibration_buffer.clear()
         self.energy_levels.clear()
-        calibration_interval = 50  #50 -> frames
+        calibration_interval = 50  # 50 -> frames
         frames_since_last_calibration = 0
+        last_button_check_time = time.time()
+        button_check_interval = 5 # 5 -> check buttons every 5 seconds
 
         try:
             while not exit_event.is_set():
@@ -127,11 +129,13 @@ class VoiceAssistant:
                     self.audioPlayer.play_audio(ResponseAudio)
                     return True
                 
-                else:
+                current_time = time.time()
+                if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
                     logger.info(f"response: {res}, brightness: {brightness}")
                     if res == 'exit':
                         self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+                    last_button_check_time = current_time
 
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
