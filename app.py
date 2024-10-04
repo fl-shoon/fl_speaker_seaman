@@ -129,7 +129,8 @@ class VoiceAssistant:
                 
                 else:
                     res, brightness = self.check_inputs()
-                    logger.info(f"response: {res}, brightness: {brightness}")
+                    time.sleep(1)
+                    # logger.info(f"response: {res}, brightness: {brightness}")
                     # if res == 'exit':
 
         except Exception as e:
@@ -184,14 +185,17 @@ class VoiceAssistant:
 
     def check_inputs(self):
         inputs = self.serial_module.get_inputs()
-        logger.info(f"inputs received: {inputs}")
         if inputs and 'result' in inputs:
             result = inputs['result']
             buttons = result['buttons']
+            logger.info(f"result: {result}")
+            logger.info(f"buttons: {buttons}")
 
             if buttons[1]:  # RIGHT button
-                self.setting_menu.display_menu()
+                response = self.setting_menu.display_menu()
                 time.sleep(0.2)
+                if response:
+                    return response
 
     def cleanup(self):
         logger.info("Starting cleanup process...")
