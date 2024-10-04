@@ -45,7 +45,7 @@ class SerialModule:
         self.comm.write(data)
 
     def get_inputs(self):
-        return self.sendCommand("getInputs", serial_connection=self.input_serial)
+        return self.sendCommand("getInputs")
 
     def send_text(self):
         self.send('test'.encode())

@@ -128,7 +128,6 @@ class VoiceAssistant:
                     return True
                 
                 else:
-                    logger.info('checking inputs')
                     res, brightness = self.check_inputs()
                     logger.info(f"response: {res}, brightness: {brightness}")
                     # if res == 'exit':
