@@ -103,7 +103,7 @@ class VoiceAssistant:
         calibration_interval = 50  # 50 -> frames
         frames_since_last_calibration = 0
         last_button_check_time = time.time()
-        button_check_interval = 3 # 3 -> check buttons every 5 seconds
+        button_check_interval = 1.5 # 1.5 -> check buttons every 1.5 seconds
 
         try:
             while not exit_event.is_set():
