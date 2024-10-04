@@ -137,13 +137,13 @@ class BrightnessModule:
                     fill=self.text_color)
 
         # Draw brightness value in a circle
-        value_size = 40
+        value_size = 20
         value_x = self.display_size[0] // 2
         value_y = bar_y - value_size // 2 - 10
         draw.ellipse([value_x - value_size//2, value_y - value_size//2, 
                       value_x + value_size//2, value_y + value_size//2], fill=self.text_color)
         brightness_percentage = int(self.current_brightness * 100)
-        percentage_font = ImageFont.truetype(self.font_path, 18)
+        percentage_font = ImageFont.truetype(self.font_path, 15)
         percentage_text = f"{brightness_percentage}"
         text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
         text_width = text_bbox[2] - text_bbox[0]
@@ -153,26 +153,22 @@ class BrightnessModule:
         draw.text((text_x, text_y), percentage_text, font=percentage_font, fill=self.background_color)
 
         # Draw navigation buttons
-        draw.polygon([(20, 120), (30, 110), (30, 130)], fill=self.text_color) # Up
-        draw.polygon([(120, 220), (110, 210), (130, 210)], fill=self.text_color) # Down
+        nav_font = ImageFont.truetype(self.font_path, 12)
         
-        fixFont = ImageFont.truetype(self.font_path, 12)
-        
+        center_x = self.display_size[0] // 2
+        draw.polygon([(center_x - 10, 20), (center_x, 10), (center_x, 30)], fill=self.text_color)  # Left arrow
         back_text = "戻る"
-        text_bbox = draw.textbbox((0, 0), back_text, font=fixFont)
+        text_bbox = draw.textbbox((0, 0), back_text, font=nav_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
-        draw.text((35, 120 - text_height // 2), back_text, font=fixFont, fill=self.text_color)
-        # draw.text((120 - text_width // 2, 195), "戻る", font=fixFont, fill=self.text_color)
+        draw.text((center_x + 5, 20 - text_height // 2), back_text, font=nav_font, fill=self.text_color)
         
-        draw.polygon([(220, 120), (210, 110), (210, 130)], fill=self.text_color)  # Right arrow
+        draw.polygon([(center_x + 10, 220), (center_x, 210), (center_x, 230)], fill=self.text_color)  # Right arrow
         confirm_text = "決定"
-        text_bbox = draw.textbbox((0, 0), confirm_text, font=fixFont)
+        text_bbox = draw.textbbox((0, 0), confirm_text, font=nav_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
-        draw.text((205 - text_width, 120 - text_height // 2), confirm_text, font=fixFont, fill=self.text_color)
-        # draw.text((120 - text_width // 2, 225), "決定", font=fixFont, fill=self.text_color)
-
+        draw.text((center_x - text_width - 5, 220 - text_height // 2), confirm_text, font=nav_font, fill=self.text_color)
         return image
     
     def update_display(self):
