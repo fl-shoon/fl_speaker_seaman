@@ -43,6 +43,7 @@ class VoiceAssistant:
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
             self.audioPlayer = AudioPlayer(self.display)
+            self.setting_menu = SettingMenu(self.serial_module)
             
             if not self.serial_module.open(USBPort):
                 # FIXME: Send a failure notice post request to server later
@@ -125,6 +126,12 @@ class VoiceAssistant:
                     logger.info("Wake word detected")
                     self.audioPlayer.play_audio(ResponseAudio)
                     return True
+                
+                else:
+                    logger.info('checking inputs')
+                    res, brightness = self.check_inputs()
+                    logger.info(f"response: {res}, brightness: {brightness}")
+                    # if res == 'exit':
 
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
@@ -176,6 +183,17 @@ class VoiceAssistant:
         self.display.fade_in_logo(SeamanLogo)
         self.audio_threadshold_calibration_done = False
 
+    def check_inputs(self):
+        inputs = self.serial_module.get_inputs()
+        logger.info(f"inputs received: {inputs}")
+        if inputs and 'result' in inputs:
+            result = inputs['result']
+            buttons = result['buttons']
+
+            if buttons[1]:  # RIGHT button
+                self.setting_menu.display_menu()
+                time.sleep(0.2)
+
     def cleanup(self):
         logger.info("Starting cleanup process...")
         if self.recorder:
@@ -186,17 +204,6 @@ class VoiceAssistant:
         if self.serial_module:
             self.serial_module.close()
         logger.info("Cleanup process completed.")
-
-def check_inputs(serial_module, setting_menu):
-    inputs = serial_module.get_inputs()
-    logger.info(f"inputs received: {inputs}")
-    if inputs and 'result' in inputs:
-        result = inputs['result']
-        buttons = result['buttons']
-
-        if buttons[1]:  # RIGHT button
-            setting_menu.display_menu()
-            time.sleep(0.2)
 
 def signal_handler(signum, frame):
     # Handle the signals when either signal is received
@@ -225,20 +232,13 @@ async def main():
 
     assistant = VoiceAssistant(args)
     aiClient.setAudioPlayer(assistant.audioPlayer)
-    setting_menu = SettingMenu(assistant.serial_module)
 
     try:
         assistant.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not exit_event.is_set():
-            wake_word_triggered = assistant.listen_for_wake_word()
-            logger.info(f"wake word triggered? : {wake_word_triggered}")
-            if wake_word_triggered:
+            if assistant.listen_for_wake_word():
                 await assistant.process_conversation()
-            logger.info('checking inputs')
-            res, brightness = check_inputs(assistant.serial_module, setting_menu)
-            logger.info(f"response: {res}, brightness: {brightness}")
-            # if res == 'exit':
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Shutting down...")
