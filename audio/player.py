@@ -31,6 +31,18 @@ class AudioPlayer:
             mixer.music.play()
             mixer.music.set_volume(0.5)
 
+    def play_trigger_with_logo(self, trigger_audio, logo_path):
+        self.play_audio(trigger_audio)
+        
+        fade_thread = threading.Thread(target=self.fade_in_logo, args=(logo_path,))
+        fade_thread.start()
+
+        while mixer.music.get_busy():
+            with suppress_stdout_stderr():
+                pygame.time.Clock().tick(10)
+
+        fade_thread.join()
+
     def sync_audio_and_gif(self, audio_file, gif_path):
         self.play_audio(audio_file)
         

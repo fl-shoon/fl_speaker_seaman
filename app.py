@@ -228,12 +228,15 @@ async def main():
     setting_menu = SettingMenu(assistant.serial_module)
 
     try:
-        assistant.display.play_trigger_with_logo(TriggerAudio, SeamanLogo, assistant.audioPlayer)
+        assistant.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not exit_event.is_set():
-            if assistant.listen_for_wake_word():
+            wake_word_triggered = assistant.listen_for_wake_word()
+            logger.info(f"wake word triggered? : {wake_word_triggered}")
+            if wake_word_triggered:
                 await assistant.process_conversation()
             else:
+                logger.info('checking inputs')
                 res, brightness = check_inputs(assistant.serial_module, setting_menu)
                 logger.info(f"response: {res}, brightness: {brightness}")
                 # if res == 'exit':
