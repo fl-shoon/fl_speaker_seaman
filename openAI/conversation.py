@@ -138,8 +138,9 @@ class OpenAIClient:
             # Generate speech (TTS)
             await self.text_to_speech(ai_response_text, output_audio_file)
 
-            await asyncio.to_thread(self.audio_player.sync_audio_and_gif, output_audio_file, SpeakingGif)
-            return output_audio_file, conversation_ended
+            # await asyncio.to_thread(self.audio_player.sync_audio_and_gif, output_audio_file, SpeakingGif)
+            self.audio_player.sync_audio_and_gif(output_audio_file, SpeakingGif)
+            return conversation_ended
 
         except Exception as e:
             logger.error(f"Error in process_audio: {e}")
