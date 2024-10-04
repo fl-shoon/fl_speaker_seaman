@@ -33,70 +33,6 @@ class BrightnessModule:
         logging.error("Could not load any fonts. Using default font.")
         return None
     
-    # def create_brightness_image(self):
-    #     if self.font is None:
-    #         return None
-        
-    #     image = Image.new('RGB', self.display_size, self.background_color)
-    #     draw = ImageDraw.Draw(image)
-
-    #     # Draw brightness icon and text
-    #     icon_size = 24
-    #     icon_x = self.display_size[0] // 2 - icon_size // 2
-    #     icon_y = 20
-    #     self.draw_icon(draw, 'brightness', (icon_x, icon_y))
-        
-    #     small_font = ImageFont.truetype(self.font_path, 14)
-    #     text = "輝度"
-    #     text_bbox = draw.textbbox((0, 0), text, font=small_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_x = self.display_size[0] // 2 - text_width // 2
-    #     draw.text((text_x, icon_y + icon_size + 5), text, font=small_font, fill=self.text_color)
-
-    #     # Draw vertical brightness bar
-    #     bar_width = 20
-    #     bar_height = 140
-    #     bar_x = (self.display_size[0] - bar_width) // 2
-    #     bar_y = 80
-    #     draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
-    #     filled_height = int(bar_height * self.current_brightness)
-    #     draw.rectangle([bar_x, bar_y + bar_height - filled_height, bar_x + bar_width, bar_y + bar_height], fill=self.highlight_color)
-
-    #     # Draw white horizontal bar (slider)
-    #     slider_width = 30
-    #     slider_height = 4
-    #     slider_y = bar_y + bar_height - filled_height - slider_height // 2
-    #     draw.rectangle([bar_x - (slider_width - bar_width) // 2, slider_y, 
-    #                     bar_x + bar_width + (slider_width - bar_width) // 2, slider_y + slider_height], 
-    #                 fill=self.text_color)
-
-    #     # Draw brightness value in a circle
-    #     value_size = 30
-    #     value_x = bar_x + bar_width + 20
-    #     value_y = slider_y + slider_height // 2
-    #     draw.ellipse([value_x, value_y - value_size//2, value_x + value_size, value_y + value_size//2], fill=self.text_color)
-    #     brightness_percentage = int(self.current_brightness * 100)
-    #     percentage_font = ImageFont.truetype(self.font_path, 14)
-    #     percentage_text = f"{brightness_percentage}"
-    #     text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     text_x = value_x + (value_size - text_width) // 2
-    #     text_y = value_y - text_height // 2
-    #     vertical_adjustment = -1  
-    #     text_y += vertical_adjustment
-    #     draw.text((text_x, text_y), percentage_text, font=percentage_font, fill=self.background_color)
-
-    #     # Draw navigation buttons
-    #     draw.polygon([(20, 120), (30, 110), (30, 130)], fill=self.text_color)  # Left arrow
-    #     draw.polygon([(220, 120), (210, 110), (210, 130)], fill=self.text_color)  # Right arrow
-    #     fixFont = ImageFont.truetype(self.font_path, 12)
-    #     draw.text((20, 135), "戻る", font=fixFont, fill=self.text_color)
-    #     draw.text((200, 135), "決定", font=fixFont, fill=self.text_color)
-
-    #     return image
-
-    # horizontal bar
     def create_brightness_image(self):
         if self.font is None:
             return None
@@ -105,72 +41,136 @@ class BrightnessModule:
         draw = ImageDraw.Draw(image)
 
         # Draw brightness icon and text
-        icon_size = 28
+        icon_size = 24
         icon_x = self.display_size[0] // 2 - icon_size // 2
-        icon_y = 180
+        icon_y = 20
         self.draw_icon(draw, 'brightness', (icon_x, icon_y))
         
-        small_font = ImageFont.truetype(self.font_path, 12)
+        small_font = ImageFont.truetype(self.font_path, 14)
         text = "輝度"
         text_bbox = draw.textbbox((0, 0), text, font=small_font)
         text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
         text_x = self.display_size[0] // 2 - text_width // 2
-        text_y = icon_y + icon_size + 5
-        draw.text((text_x, text_y), text, font=small_font, fill=self.text_color)
+        draw.text((text_x, icon_y + icon_size + 5), text, font=small_font, fill=self.text_color)
 
-        # Draw horizontal brightness bar
-        bar_height = 20
-        bar_width = 125
+        # Draw vertical brightness bar
+        bar_width = 20
+        bar_height = 140
         bar_x = (self.display_size[0] - bar_width) // 2
-        bar_y = self.display_size[1] // 2 - bar_height // 2
+        bar_y = 80
         draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
-        filled_width = int(bar_width * self.current_brightness)
-        draw.rectangle([bar_x, bar_y, bar_x + filled_width, bar_y + bar_height], fill=self.highlight_color)
+        filled_height = int(bar_height * self.current_brightness)
+        draw.rectangle([bar_x, bar_y + bar_height - filled_height, bar_x + bar_width, bar_y + bar_height], fill=self.highlight_color)
 
-        # Draw vertical slider bar
-        slider_width = 4
-        slider_height = 40
-        slider_x = bar_x + filled_width - slider_width // 2
-        slider_y = bar_y - (slider_height - bar_height) // 2
-        draw.rectangle([slider_x, slider_y, 
-                        slider_x + slider_width, slider_y + slider_height], 
+        # Draw white horizontal bar (slider)
+        slider_width = 30
+        slider_height = 4
+        slider_y = bar_y + bar_height - filled_height - slider_height // 2
+        draw.rectangle([bar_x - (slider_width - bar_width) // 2, slider_y, 
+                        bar_x + bar_width + (slider_width - bar_width) // 2, slider_y + slider_height], 
                     fill=self.text_color)
 
         # Draw brightness value in a circle
-        value_size = 28
-        value_x = self.display_size[0] // 2
-        value_y = bar_y - value_size // 2 - 10
-        draw.ellipse([value_x - value_size//2, value_y - value_size//2, 
-                      value_x + value_size//2, value_y + value_size//2], fill=self.text_color)
+        value_size = 30
+        value_x = bar_x + bar_width + 20
+        value_y = slider_y + slider_height // 2
+        draw.ellipse([value_x, value_y - value_size//2, value_x + value_size, value_y + value_size//2], fill=self.text_color)
         brightness_percentage = int(self.current_brightness * 100)
-        percentage_font = ImageFont.truetype(self.font_path, 15)
+        percentage_font = ImageFont.truetype(self.font_path, 14)
         percentage_text = f"{brightness_percentage}"
         text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
-        text_x = value_x - text_width // 2
+        text_x = value_x + (value_size - text_width) // 2
         text_y = value_y - text_height // 2
+        vertical_adjustment = -1  
+        text_y += vertical_adjustment
         draw.text((text_x, text_y), percentage_text, font=percentage_font, fill=self.background_color)
 
         # Draw navigation buttons
-        nav_font = ImageFont.truetype(self.font_path, 12)
-        
-        center_x = self.display_size[0] // 2
-        draw.polygon([(center_x - 10, 20), (center_x, 10), (center_x, 30)], fill=self.text_color)  # Left arrow
-        back_text = "戻る"
-        text_bbox = draw.textbbox((0, 0), back_text, font=nav_font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
-        draw.text((center_x + 5, 20 - text_height // 2), back_text, font=nav_font, fill=self.text_color)
-        
-        draw.polygon([(center_x + 10, 220), (center_x, 210), (center_x, 230)], fill=self.text_color)  # Right arrow
-        confirm_text = "決定"
-        text_bbox = draw.textbbox((0, 0), confirm_text, font=nav_font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
-        draw.text((center_x - text_width - 5, 220 - text_height // 2), confirm_text, font=nav_font, fill=self.text_color)
+        draw.polygon([(20, 120), (30, 110), (30, 130)], fill=self.text_color)  # Left arrow
+        draw.polygon([(220, 120), (210, 110), (210, 130)], fill=self.text_color)  # Right arrow
+        fixFont = ImageFont.truetype(self.font_path, 12)
+        draw.text((20, 135), "戻る", font=fixFont, fill=self.text_color)
+        draw.text((200, 135), "決定", font=fixFont, fill=self.text_color)
+
         return image
+
+    # horizontal bar
+    # def create_brightness_image(self):
+    #     if self.font is None:
+    #         return None
+        
+    #     image = Image.new('RGB', self.display_size, self.background_color)
+    #     draw = ImageDraw.Draw(image)
+
+    #     # Draw brightness icon and text
+    #     icon_size = 28
+    #     icon_x = self.display_size[0] // 2 - icon_size // 2
+    #     icon_y = 180
+    #     self.draw_icon(draw, 'brightness', (icon_x, icon_y))
+        
+    #     small_font = ImageFont.truetype(self.font_path, 12)
+    #     text = "輝度"
+    #     text_bbox = draw.textbbox((0, 0), text, font=small_font)
+    #     text_width = text_bbox[2] - text_bbox[0]
+    #     text_height = text_bbox[3] - text_bbox[1]
+    #     text_x = self.display_size[0] // 2 - text_width // 2
+    #     text_y = icon_y + icon_size + 5
+    #     draw.text((text_x, text_y), text, font=small_font, fill=self.text_color)
+
+    #     # Draw horizontal brightness bar
+    #     bar_height = 20
+    #     bar_width = 125
+    #     bar_x = (self.display_size[0] - bar_width) // 2
+    #     bar_y = self.display_size[1] // 2 - bar_height // 2
+    #     draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
+    #     filled_width = int(bar_width * self.current_brightness)
+    #     draw.rectangle([bar_x, bar_y, bar_x + filled_width, bar_y + bar_height], fill=self.highlight_color)
+
+    #     # Draw vertical slider bar
+    #     slider_width = 4
+    #     slider_height = 40
+    #     slider_x = bar_x + filled_width - slider_width // 2
+    #     slider_y = bar_y - (slider_height - bar_height) // 2
+    #     draw.rectangle([slider_x, slider_y, 
+    #                     slider_x + slider_width, slider_y + slider_height], 
+    #                 fill=self.text_color)
+
+    #     # Draw brightness value in a circle
+    #     value_size = 28
+    #     value_x = self.display_size[0] // 2
+    #     value_y = bar_y - value_size // 2 - 10
+    #     draw.ellipse([value_x - value_size//2, value_y - value_size//2, 
+    #                   value_x + value_size//2, value_y + value_size//2], fill=self.text_color)
+    #     brightness_percentage = int(self.current_brightness * 100)
+    #     percentage_font = ImageFont.truetype(self.font_path, 15)
+    #     percentage_text = f"{brightness_percentage}"
+    #     text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
+    #     text_width = text_bbox[2] - text_bbox[0]
+    #     text_height = text_bbox[3] - text_bbox[1]
+    #     text_x = value_x - text_width // 2
+    #     text_y = value_y - text_height // 2
+    #     draw.text((text_x, text_y), percentage_text, font=percentage_font, fill=self.background_color)
+
+    #     # Draw navigation buttons
+    #     nav_font = ImageFont.truetype(self.font_path, 12)
+        
+    #     center_x = self.display_size[0] // 2
+    #     draw.polygon([(center_x - 10, 20), (center_x, 10), (center_x, 30)], fill=self.text_color)  # Left arrow
+    #     back_text = "戻る"
+    #     text_bbox = draw.textbbox((0, 0), back_text, font=nav_font)
+    #     text_width = text_bbox[2] - text_bbox[0]
+    #     text_height = text_bbox[3] - text_bbox[1]
+    #     draw.text((center_x + 5, 20 - text_height // 2), back_text, font=nav_font, fill=self.text_color)
+        
+    #     draw.polygon([(center_x + 10, 220), (center_x, 210), (center_x, 230)], fill=self.text_color)  # Right arrow
+    #     confirm_text = "決定"
+    #     text_bbox = draw.textbbox((0, 0), confirm_text, font=nav_font)
+    #     text_width = text_bbox[2] - text_bbox[0]
+    #     text_height = text_bbox[3] - text_bbox[1]
+    #     draw.text((center_x - text_width - 5, 220 - text_height // 2), confirm_text, font=nav_font, fill=self.text_color)
+    #     return image
     
     def update_display(self):
         image = self.create_brightness_image()
