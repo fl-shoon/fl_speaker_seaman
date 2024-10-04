@@ -4,7 +4,7 @@ from collections import deque
 from display.show import DisplayModule
 # from display.setting import SettingModule
 from etc.define import *
-from openAI.chat import OpenAIModule
+from openAI.conversation import OpenAIModule
 from pvrecorder import PvRecorder
 from pico.pico import PicoVoiceTrigger
 from threading import Event
@@ -163,7 +163,7 @@ class VoiceAssistant:
             self.display.stop_listening_display()
 
             try:
-                response_file, conversation_ended = await self.ai_client.process_audio(input_audio_file)
+                response_file, conversation_ended = await self.ai_client.stt_gpt_tts_process(input_audio_file)
                 if response_file:
                     await asyncio.to_thread(sync_audio_and_gif, self.display, response_file, SpeakingGif)
                     if conversation_ended:

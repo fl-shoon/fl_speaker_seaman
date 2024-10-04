@@ -256,7 +256,6 @@ class OpenAIClient:
 
         full_response = ""
         buffer = ""
-        sentence = ""
         async for chunk in self.stream_api_call("chat/completions", payload):
             buffer += chunk.decode('utf-8')
             while True:
@@ -273,11 +272,7 @@ class OpenAIClient:
                         content = chunk_data['choices'][0]['delta'].get('content', '')
                         if content:
                             full_response += content
-                            sentence += content
                             yield content
-                            # if re.search(r'[。.!?！？]', content):
-                            #     yield sentence
-                            #     sentence = ""
                 except ValueError:  
                     break
                 except json.JSONDecodeError as e:
