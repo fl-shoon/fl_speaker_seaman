@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class SettingMenu:
-    def __init__(self, serial_module):
+    def __init__(self, serial_module, brightness):
         self.serial_module = serial_module
         self.input_serial = serial_module.input_serial
         
@@ -33,7 +33,7 @@ class SettingMenu:
         self.selected_item = 1
         self.font = self.load_font()
 
-        self.brightness = 1.0
+        self.brightness = brightness
         self.brightness_control = BrightnessModule(serial_module, self.input_serial, self.brightness)
         self.current_menu_image = None
 
