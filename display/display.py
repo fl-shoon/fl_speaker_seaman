@@ -47,7 +47,7 @@ class DisplayModule:
             brightened_img = enhancer.enhance(current_brightness)
 
             img_byte_arr = io.BytesIO()
-            rgb_img.save(brightened_img, format='PNG')
+            brightened_img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             self.serial_module.send_image_data(img_byte_arr)
