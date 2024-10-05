@@ -36,6 +36,7 @@ class VoiceAssistant:
         self.interactive_recorder = InteractiveRecorder()
         self.calibration_buffer = deque(maxlen=100)  
         self.energy_levels = deque(maxlen=100)
+        self.brightness = 1.0
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
@@ -132,9 +133,10 @@ class VoiceAssistant:
                 current_time = time.time()
                 if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
+                    self.brightness = brightness
                     if res == 'exit':
                         logger.info(f"response: {res}, brightness: {brightness}")
-                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo, brightness)
                     last_button_check_time = current_time
 
         except Exception as e:
@@ -184,7 +186,7 @@ class VoiceAssistant:
                 self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
                 conversation_active = False
 
-        self.display.fade_in_logo(SeamanLogo)
+        self.display.fade_in_logo(SeamanLogo, self.brightness)
         self.audio_threadshold_calibration_done = False
 
     def check_buttons(self):
@@ -240,7 +242,7 @@ async def main():
     aiClient.setAudioPlayer(assistant.audioPlayer)
 
     try:
-        assistant.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+        assistant.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo, assistant.brightness)
 
         while not exit_event.is_set():
             if assistant.listen_for_wake_word():

@@ -1,5 +1,5 @@
 import time, io, os, logging
-from PIL import Image
+from PIL import Image, ImageEnhance
 from pygame import mixer
 from contextlib import contextmanager
 
@@ -24,12 +24,14 @@ class DisplayModule:
     def __init__(self, serial_module):
         self.serial_module = serial_module
 
-    def fade_in_logo(self, logo_path, steps=7):
+    def fade_in_logo(self, logo_path, steps=10, brightness=1.0):
         img = Image.open(logo_path)
         width, height = img.size
         
         for i in range(steps):
             alpha = int(255 * (i + 1) / steps)
+            current_brightness = brightness * (i + 1) / steps
+
             faded_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             faded_img.paste(img, (0, 0))
             faded_img.putalpha(alpha)
@@ -37,8 +39,11 @@ class DisplayModule:
             rgb_img = Image.new("RGB", faded_img.size, (0, 0, 0))
             rgb_img.paste(faded_img, mask=faded_img.split()[3])
 
+            enhancer = ImageEnhance.Brightness(rgb_img)
+            brightened_img = enhancer.enhance(current_brightness)
+
             img_byte_arr = io.BytesIO()
-            rgb_img.save(img_byte_arr, format='PNG')
+            rgb_img.save(brightened_img, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             self.serial_module.send_image_data(img_byte_arr)
@@ -54,14 +59,14 @@ class DisplayModule:
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
-    def display_gif(self, gif_path, stop_event):
-        frames = self.serial_module.prepare_gif(gif_path)
-        all_frames = self.serial_module.precompute_frames(frames)
-        frame_index = 0
-        while not stop_event.is_set():
-            self.serial_module.send_image_data(all_frames[frame_index])
-            frame_index = (frame_index + 1) % len(all_frames)
-            time.sleep(0.1)
+    # def display_gif(self, gif_path, stop_event):
+    #     frames = self.serial_module.prepare_gif(gif_path)
+    #     all_frames = self.serial_module.precompute_frames(frames)
+    #     frame_index = 0
+    #     while not stop_event.is_set():
+    #         self.serial_module.send_image_data(all_frames[frame_index])
+    #         frame_index = (frame_index + 1) % len(all_frames)
+    #         time.sleep(0.1)
 
     def display_image(self, image_path):
         try:
