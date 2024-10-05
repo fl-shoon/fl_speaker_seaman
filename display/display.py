@@ -59,8 +59,8 @@ class DisplayModule:
         frame_index = 0
         while mixer.music.get_busy():
             frame = Image.open(io.BytesIO(all_frames[frame_index]))
-            brightened_frame = self.update_brightness(frame, self.brightness)
-            self.serial_module.send_image_data(brightened_frame)
+            # brightened_frame = self.update_brightness(frame, self.brightness)
+            self.serial_module.send_image_data(frame)
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
@@ -88,10 +88,11 @@ class DisplayModule:
                 img = img.resize((240, 240))
                 # logger.info("Image resized to 240x240")
 
-            brightened_image = self.update_brightness(img, self.brightness)
+            # brightened_image = self.update_brightness(img, self.brightness)
 
             img_byte_arr = io.BytesIO()
-            brightened_image.save(img_byte_arr, format='PNG')
+            img.save(img_byte_arr, format='PNG')
+            # brightened_image.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             # logger.info("Sending image to display...")
