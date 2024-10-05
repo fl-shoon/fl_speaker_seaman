@@ -134,9 +134,10 @@ class VoiceAssistant:
                 if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
                     self.brightness = brightness
+                    self.display.update_brightness(brightness)
                     if res == 'exit':
                         logger.info(f"response: {res}, brightness: {brightness}")
-                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo, brightness)
+                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
                     last_button_check_time = current_time
 
         except Exception as e:
@@ -242,7 +243,7 @@ async def main():
     aiClient.setAudioPlayer(assistant.audioPlayer)
 
     try:
-        assistant.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo, assistant.brightness)
+        assistant.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not exit_event.is_set():
             if assistant.listen_for_wake_word():

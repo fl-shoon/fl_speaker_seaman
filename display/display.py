@@ -23,14 +23,18 @@ def suppress_stdout_stderr():
 class DisplayModule:
     def __init__(self, serial_module):
         self.serial_module = serial_module
+        self.brightness = 1.0
 
-    def fade_in_logo(self, logo_path, steps=10, brightness=1.0):
+    def update_brightness(self, brightness):
+        self.brightness = brightness
+
+    def fade_in_logo(self, logo_path, steps=10):
         img = Image.open(logo_path)
         width, height = img.size
         
         for i in range(steps):
             alpha = int(255 * (i + 1) / steps)
-            current_brightness = brightness * (i + 1) / steps
+            current_brightness = self.brightness * (i + 1) / steps
 
             faded_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             faded_img.paste(img, (0, 0))
