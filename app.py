@@ -134,7 +134,7 @@ class VoiceAssistant:
                 if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
                     self.brightness = brightness
-                    self.display.update_brightness(brightness)
+                    self.display.set_brightness(brightness)
                     if res == 'exit':
                         logger.info(f"response: {res}, brightness: {brightness}")
                         self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)

@@ -25,7 +25,7 @@ class DisplayModule:
         self.serial_module = serial_module
         self.brightness = 1.0
 
-    def update_brightness(self, brightness):
+    def set_brightness(self, brightness):
         self.brightness = brightness
 
     def fade_in_logo(self, logo_path, steps=10):
@@ -43,8 +43,7 @@ class DisplayModule:
             rgb_img = Image.new("RGB", faded_img.size, (0, 0, 0))
             rgb_img.paste(faded_img, mask=faded_img.split()[3])
 
-            enhancer = ImageEnhance.Brightness(rgb_img)
-            brightened_img = enhancer.enhance(current_brightness)
+            brightened_img = self.update_brightness(rgb_img, current_brightness)
 
             img_byte_arr = io.BytesIO()
             brightened_img.save(img_byte_arr, format='PNG')
@@ -59,7 +58,9 @@ class DisplayModule:
         
         frame_index = 0
         while mixer.music.get_busy():
-            self.serial_module.send_image_data(all_frames[frame_index])
+            frame = Image.open(io.BytesIO(all_frames[frame_index]))
+            brightened_frame = self.update_brightness(frame, self.brightness)
+            self.serial_module.send_image_data(brightened_frame)
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
@@ -87,8 +88,10 @@ class DisplayModule:
                 img = img.resize((240, 240))
                 # logger.info("Image resized to 240x240")
 
+            brightened_image = self.update_brightness(img, self.brightness)
+
             img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
+            brightened_image.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             # logger.info("Sending image to display...")
@@ -110,5 +113,10 @@ class DisplayModule:
             self.display_thread.join()
         self.serial_module.send_white_frames()
 
+    def update_brightness(self, image, brightnessValue):
+        enhancer = ImageEnhance.Brightness(image)
+        brightened_img = enhancer.enhance(brightnessValue)
+        return brightened_img
+    
     def send_white_frames(self):
         self.serial_module.send_white_frames()
