@@ -322,6 +322,7 @@ class SettingMenu:
                     elif buttons[0]:  # LEFT button
                         logger.info("Returning to main app.")
                         return 'exit'
+                    time.sleep(0.2)
                 return None
             except Exception as e:
                 logging.error(f"An unexpected error occurred: {e}", exc_info=True)
