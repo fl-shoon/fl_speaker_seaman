@@ -265,8 +265,17 @@ class SettingMenu:
     def display_menu(self):
         self.update_display()
         while True:
-            action = self.check_inputs()
-            if action == 'back':
-                logger.info("Returning to main app.")
-                return 'exit'
-            time.sleep(0.1)
+            try:
+                action = self.check_inputs()
+                if action == 'back':
+                    logger.info("Returning to main app.")
+                    return 'exit'
+                if action == 'clean':
+                    return 'clean'
+                time.sleep(0.1)
+            except Exception as e:
+                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                return 'clean'
+            except KeyboardInterrupt:
+                logging.info("KeyboardInterrupt received. Shutting down...")
+                return 'clean'

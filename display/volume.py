@@ -142,28 +142,8 @@ class SettingVolume:
             ]
             draw.arc(arc_bbox, start=300, end=60, fill=(255, 255, 255), width=2)
 
-    def command(self, method, params=None, serial_connection=None):
-        if serial_connection is None:
-            serial_connection = self.input_serial  
-        
-        message = {"method": method}
-        if params:
-            message["params"] = params
-        
-        serial_connection.write(json.dumps(message).encode() + b'\n')
-        response = serial_connection.readline().decode().strip()
-        
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            logging.error(f"Failed to parse response: {response}")
-            return None
-
-    def get_inputs(self):
-        return self.command("getInputs", serial_connection=self.input_serial)
-    
     def check_buttons(self):
-        input_data = self.get_inputs()
+        input_data = self.serial_module.get_inputs()
         if input_data and 'result' in input_data:
             result = input_data['result']
             buttons = result['buttons']
@@ -191,10 +171,17 @@ class SettingVolume:
             return 'back', self.current_volume
         self.update_display()
         while True:
-            action = self.check_buttons()
-            if action == 'back':
-                self.current_volume = self.initial_volume
-                return 'back', self.current_volume
-            elif action == 'confirm':
-                return 'confirm', self.current_volume
-            time.sleep(0.1)
+            try:
+                action = self.check_buttons()
+                if action == 'back':
+                    self.current_volume = self.initial_volume
+                    return 'back', self.current_volume
+                elif action == 'confirm':
+                    return 'confirm', self.current_volume
+                time.sleep(0.1)
+            except Exception as e:
+                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                return 'clean', self.current_volume
+            except KeyboardInterrupt:
+                logging.info("KeyboardInterrupt received. Shutting down...")
+                return 'clean', self.current_volume

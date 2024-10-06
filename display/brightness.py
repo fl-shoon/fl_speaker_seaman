@@ -96,6 +96,87 @@ class SettingBrightness:
 
         return image
 
+    def update_display(self):
+        image = self.create_brightness_image()
+        
+        # Apply current brightness to the image
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(self.current_brightness)
+
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+
+        self.serial_module.send_image_data(img_byte_arr)
+
+    def draw_icon(self, draw, position):
+        x, y = position
+        size = 24  
+
+        # Half-filled sun icon
+        center = size // 2
+        
+        # Draw the full circle outline
+        draw.ellipse([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], outline=self.text_color, width=2)
+        
+        # Fill the left half of the circle
+        draw.pieslice([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], start=90, end=270, fill=self.text_color)
+        
+        # Draw the rays
+        for i in range(8):
+            angle = i * 45
+            x1 = x + center + int(size*0.58 * math.cos(math.radians(angle)))
+            y1 = y + center + int(size*0.58 * math.sin(math.radians(angle)))
+            x2 = x + center + int(size*0.42 * math.cos(math.radians(angle)))
+            y2 = y + center + int(size*0.42 * math.sin(math.radians(angle)))
+            draw.line([x1, y1, x2, y2], fill=self.text_color, width=2)
+
+    def check_buttons(self):
+        input_data = self.serial_module.get_inputs()
+        if input_data and 'result' in input_data:
+            result = input_data['result']
+            buttons = result['buttons']
+
+            if buttons[3]:  # UP button
+                self.current_brightness = min(1.0, self.current_brightness + 0.05)
+                self.update_display()
+                time.sleep(0.2)
+                return 'adjust'
+            elif buttons[2]:  # DOWN button
+                self.current_brightness = max(0.0, self.current_brightness - 0.05)
+                self.update_display()
+                time.sleep(0.2)
+                return 'adjust'
+            elif buttons[1]:  # RIGHT button
+                return 'confirm'
+            elif buttons[0]:  # LEFT button
+                return 'back'
+
+        return None
+
+    def run(self):
+        image = self.create_brightness_image()
+        if image is None:
+            return 'back', self.current_brightness
+        self.update_display()
+        while True:
+            try:
+                action = self.check_buttons()
+                if action == 'back':
+                    # Revert to initial brightness without saving
+                    self.current_brightness = self.initial_brightness
+                    return 'back', self.current_brightness
+                elif action == 'confirm':
+                    # Save the new brightness
+                    return 'confirm', self.current_brightness
+                time.sleep(0.1)
+            except Exception as e:
+                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                return 'clean', self.current_brightness
+            except KeyboardInterrupt:
+                logging.info("KeyboardInterrupt received. Shutting down...")
+                return 'clean', self.current_brightness
+
     # horizontal bar
     # def create_brightness_image(self):
     #     if self.font is None:
@@ -171,97 +252,3 @@ class SettingBrightness:
     #     text_height = text_bbox[3] - text_bbox[1]
     #     draw.text((center_x - text_width - 5, 220 - text_height // 2), confirm_text, font=nav_font, fill=self.text_color)
     #     return image
-    
-    def update_display(self):
-        image = self.create_brightness_image()
-        
-        # Apply current brightness to the image
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(self.current_brightness)
-
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-
-        self.serial_module.send_image_data(img_byte_arr)
-
-    def draw_icon(self, draw, position):
-        x, y = position
-        size = 24  
-
-        # Half-filled sun icon
-        center = size // 2
-        
-        # Draw the full circle outline
-        draw.ellipse([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], outline=self.text_color, width=2)
-        
-        # Fill the left half of the circle
-        draw.pieslice([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], start=90, end=270, fill=self.text_color)
-        
-        # Draw the rays
-        for i in range(8):
-            angle = i * 45
-            x1 = x + center + int(size*0.58 * math.cos(math.radians(angle)))
-            y1 = y + center + int(size*0.58 * math.sin(math.radians(angle)))
-            x2 = x + center + int(size*0.42 * math.cos(math.radians(angle)))
-            y2 = y + center + int(size*0.42 * math.sin(math.radians(angle)))
-            draw.line([x1, y1, x2, y2], fill=self.text_color, width=2)
-
-    def command(self, method, params=None, serial_connection=None):
-        if serial_connection is None:
-            serial_connection = self.input_serial  
-        
-        message = {"method": method}
-        if params:
-            message["params"] = params
-        
-        serial_connection.write(json.dumps(message).encode() + b'\n')
-        response = serial_connection.readline().decode().strip()
-        
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            logging.error(f"Failed to parse response: {response}")
-            return None
-
-    def get_inputs(self):
-        return self.command("getInputs", serial_connection=self.input_serial)
-    
-    def check_buttons(self):
-        input_data = self.get_inputs()
-        if input_data and 'result' in input_data:
-            result = input_data['result']
-            buttons = result['buttons']
-
-            if buttons[3]:  # UP button
-                self.current_brightness = min(1.0, self.current_brightness + 0.05)
-                self.update_display()
-                time.sleep(0.2)
-                return 'adjust'
-            elif buttons[2]:  # DOWN button
-                self.current_brightness = max(0.0, self.current_brightness - 0.05)
-                self.update_display()
-                time.sleep(0.2)
-                return 'adjust'
-            elif buttons[1]:  # RIGHT button
-                return 'confirm'
-            elif buttons[0]:  # LEFT button
-                return 'back'
-
-        return None
-
-    def run(self):
-        image = self.create_brightness_image()
-        if image is None:
-            return 'back', self.current_brightness
-        self.update_display()
-        while True:
-            action = self.check_buttons()
-            if action == 'back':
-                # Revert to initial brightness without saving
-                self.current_brightness = self.initial_brightness
-                return 'back', self.current_brightness
-            elif action == 'confirm':
-                # Save the new brightness
-                return 'confirm', self.current_brightness
-            time.sleep(0.1)
