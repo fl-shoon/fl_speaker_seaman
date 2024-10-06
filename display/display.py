@@ -91,16 +91,11 @@ class DisplayModule:
                 img = img.resize((240, 240))
                 # logger.info("Image resized to 240x240")
 
-            try:
-                brightened_img = self.update_brightness(img, self.brightness)
-            except Exception as e:
-                logger.info(e)
+            enhancer = ImageEnhance.Brightness(img)
+            brightened_img = enhancer.enhance(self.brightness)
 
             img_byte_arr = io.BytesIO()
-            if brightened_img:
-                brightened_img.save(img_byte_arr, format='PNG')
-            else:
-                img.save(img_byte_arr, format='PNG')
+            brightened_img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             # logger.info("Sending image to display...")
