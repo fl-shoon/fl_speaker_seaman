@@ -170,9 +170,6 @@ class SettingVolume:
         return None
 
     def run(self):
-        # image = self.create_volume_image()
-        # if image is None:
-        #     return 'back', self.current_volume
         self.update_display()
         while True:
             try:

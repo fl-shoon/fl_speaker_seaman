@@ -37,7 +37,7 @@ class SettingMenu:
         self.brightness = self.serial_module.current_brightness
         self.volume = audio_player.current_volume
         self.audio_player = audio_player
-        self.brightness_control = SettingBrightness(serial_module, self.input_serial, self.brightness)
+        self.brightness_control = SettingBrightness(serial_module, self.input_serial)
         self.volume_control = SettingVolume(serial_module, self.input_serial, self.volume)
         self.current_menu_image = None
 

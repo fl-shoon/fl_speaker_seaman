@@ -4,15 +4,15 @@ import io, time, math, logging, json
 logging.basicConfig(level=logging.INFO)
 
 class SettingBrightness:
-    def __init__(self, serial_module, mcu_module, initial_brightness=0.5):
+    def __init__(self, serial_module, mcu_module):
         self.serial_module = serial_module
         self.input_serial = mcu_module
         self.background_color = (73, 80, 87)
         self.text_color = (255, 255, 255)
         self.highlight_color = (0, 119, 255)
         self.display_size = (240, 240)
-        self.initial_brightness = initial_brightness
-        self.current_brightness = initial_brightness
+        self.initial_brightness = self.serial_module.current_brightness
+        self.current_brightness = self.serial_module.current_brightness
         self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
         self.font = self.load_font()
 
@@ -155,9 +155,6 @@ class SettingBrightness:
         return None
 
     def run(self):
-        # image = self.create_brightness_image()
-        # if image is None:
-        #     return 'back', self.current_brightness
         self.update_display()
         while True:
             try:
