@@ -12,7 +12,7 @@ class SettingVolume:
         self.highlight_color = (0, 119, 255)
         self.display_size = (240, 240)
         self.audio_player = audio_player
-        self.current_volume = audio_player.current_volume
+        self.current_volume = self.audio_player.current_volume
         self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
         self.font = self.load_font()
 
