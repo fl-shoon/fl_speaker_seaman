@@ -82,10 +82,8 @@ class DisplayModule:
                 img = img.resize((240, 240))
                 # logger.info("Image resized to 240x240")
 
-            enhancer = ImageEnhance.Brightness(img)
-            brightened_img = enhancer.enhance(self.brightness)
             img_byte_arr = io.BytesIO()
-            brightened_img.save(img_byte_arr, format='PNG')
+            img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             # logger.info("Sending image to display...")
