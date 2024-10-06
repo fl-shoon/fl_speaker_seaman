@@ -155,8 +155,8 @@ class SettingBrightness:
                     else:
                         time.sleep(0.1)
             except KeyboardInterrupt:
-                logging.info("KeyboardInterrupt received. Going back...")
-                return 'clean', self.serial_module.current_brightness
+                logging.info("KeyboardInterrupt at Brightness Adjustment. Going back...")
             except Exception as e:
-                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                logging.error(f"Error occurred at Brightness Adjustment: {e}", exc_info=True)
+            finally:
                 return 'clean', self.serial_module.current_brightness

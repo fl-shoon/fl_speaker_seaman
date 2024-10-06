@@ -191,10 +191,10 @@ class SettingVolume:
                     elif buttons[0]:  # LEFT button
                         return 'back', self.initial_volume
             except KeyboardInterrupt:
-                logging.info("KeyboardInterrupt received. Going back...")
-                return 'clean', self.initial_volume
+                logging.info("KeyboardInterrupt at Volume Adjustment. Going back...")
             except Exception as e:
-                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                logging.error(f"Error occurred at Volume Adjustment: {e}", exc_info=True)
+            finally:
                 return 'clean', self.initial_volume
             # action = self.check_buttons()
             # if action == 'back':
