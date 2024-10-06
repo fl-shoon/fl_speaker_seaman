@@ -98,7 +98,6 @@ class SettingVolume:
 
     def update_display(self):
         image = self.create_volume_image()
-        logging.info(f"volume -> update_display -> {self.serial_module.current_brightness}")
 
         # Apply current brightness to the image
         enhancer = ImageEnhance.Brightness(image)
