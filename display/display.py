@@ -28,9 +28,10 @@ class DisplayModule:
     def set_brightness(self, brightness):
         self.brightness = brightness
 
-    def fade_in_logo(self, logo_path, steps=10):
+    def fade_in_logo(self, logo_path, steps=7):
         img = Image.open(logo_path)
         width, height = img.size
+        img = self.update_brightness(img, current_brightness)
         
         for i in range(steps):
             alpha = int(255 * (i + 1) / steps)
@@ -43,10 +44,8 @@ class DisplayModule:
             rgb_img = Image.new("RGB", faded_img.size, (0, 0, 0))
             rgb_img.paste(faded_img, mask=faded_img.split()[3])
 
-            brightened_img = self.update_brightness(rgb_img, current_brightness)
-
             img_byte_arr = io.BytesIO()
-            brightened_img.save(img_byte_arr, format='PNG')
+            rgb_img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             self.serial_module.send_image_data(img_byte_arr)
@@ -63,6 +62,7 @@ class DisplayModule:
             img_byte_arr = io.BytesIO()
             brightened_frame.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
+            self.serial_module.send_image_data(img_byte_arr)
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
@@ -80,6 +80,7 @@ class DisplayModule:
             # logger.info(f"Opening image: {image_path}")
             img = Image.open(image_path)
             width, height = img.size
+            img = self.update_brightness(img, self.brightness)
             # logger.info(f"Image size: {width}x{height}")
 
             # Convert image to RGB mode if it's not already
@@ -90,11 +91,8 @@ class DisplayModule:
                 img = img.resize((240, 240))
                 # logger.info("Image resized to 240x240")
 
-            brightened_image = self.update_brightness(img, self.brightness)
-
             img_byte_arr = io.BytesIO()
-            # img.save(img_byte_arr, format='PNG')
-            brightened_image.save(img_byte_arr, format='PNG')
+            img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             # logger.info("Sending image to display...")
