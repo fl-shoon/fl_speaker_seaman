@@ -26,7 +26,11 @@ class DisplayModule:
         self.brightness = 1.0
 
     def set_brightness(self, brightness):
-        self.brightness = brightness
+        self.brightness = max(0.0, min(1.0, brightness))
+
+    def apply_brightness(self, img):
+        enhancer = ImageEnhance.Brightness(img)
+        return enhancer.enhance(self.brightness)
 
     def fade_in_logo(self, logo_path, steps=7):
         img = Image.open(logo_path)
@@ -74,8 +78,10 @@ class DisplayModule:
                 img = img.resize((240, 240))
                 # logger.info("Image resized to 240x240")
 
+            brightened_img = self.apply_brightness(img)
+
             img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
+            brightened_img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             # logger.info("Sending image to display...")
