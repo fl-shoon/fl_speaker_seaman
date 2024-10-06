@@ -78,6 +78,8 @@ class SettingMenu:
                     if action == 'confirm':
                         self.audio_player.set_audio_volume(new_volume)
                         logger.info(f"Volume updated to {new_volume:.2f}")
+                    elif action == 'clean':
+                        return action
                     else:
                         logger.info("Volume adjustment cancelled")
                     self.update_display()
@@ -86,6 +88,8 @@ class SettingMenu:
                     if action == 'confirm':
                         self.serial_module.set_brightness(new_brightness)
                         logger.info(f"Brightness updated to {new_brightness:.2f}")
+                    elif action == 'clean':
+                        return action
                     else:
                         logger.info("Brightness adjustment cancelled")
                     self.update_display()
@@ -267,4 +271,4 @@ class SettingMenu:
                 logger.info("Returning to main app.")
                 return 'exit'
             if action == 'clean':
-                return 'clean'
+                return action

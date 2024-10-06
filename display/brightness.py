@@ -11,7 +11,6 @@ class SettingBrightness:
         self.text_color = (255, 255, 255)
         self.highlight_color = (0, 119, 255)
         self.display_size = (240, 240)
-        # self.initial_brightness = self.serial_module.current_brightness
         self.current_brightness = self.serial_module.current_brightness
         self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
         self.font = self.load_font()
@@ -131,132 +130,33 @@ class SettingBrightness:
             y2 = y + center + int(size*0.42 * math.sin(math.radians(angle)))
             draw.line([x1, y1, x2, y2], fill=self.text_color, width=2)
 
-    # def check_buttons(self):
-    #     input_data = self.serial_module.get_inputs()
-    #     if input_data and 'result' in input_data:
-    #         result = input_data['result']
-    #         buttons = result['buttons']
-
-    #         if buttons[3]:  # UP button
-    #             self.current_brightness = min(1.0, self.current_brightness + 0.05)
-    #             self.update_display()
-    #             time.sleep(0.2)
-    #             return 'adjust'
-    #         elif buttons[2]:  # DOWN button
-    #             self.current_brightness = max(0.0, self.current_brightness - 0.05)
-    #             self.update_display()
-    #             time.sleep(0.2)
-    #             return 'adjust'
-    #         elif buttons[1]:  # RIGHT button
-    #             return 'confirm'
-    #         elif buttons[0]:  # LEFT button
-    #             return 'back'
-
-    #     return None
-
     def run(self):
         self.update_display()
         while True:
-            input_data = self.serial_module.get_inputs()
-            if input_data and 'result' in input_data:
-                result = input_data['result']
-                buttons = result['buttons']
+            try:
+                input_data = self.serial_module.get_inputs()
+                if input_data and 'result' in input_data:
+                    result = input_data['result']
+                    buttons = result['buttons']
 
-                if buttons[3]:  # UP button
-                    self.current_brightness = min(1.0, self.current_brightness + 0.05)
-                    self.update_display()
-                    time.sleep(0.2)
-                elif buttons[2]:  # DOWN button
-                    self.current_brightness = max(0.0, self.current_brightness - 0.05)
-                    self.update_display()
-                    time.sleep(0.2)
-                elif buttons[1]:  # RIGHT button
-                    return 'confirm', self.current_brightness
-                elif buttons[0]:  # LEFT button
-                    self.current_brightness = self.serial_module.current_brightness
-                    return 'back', self.serial_module.current_brightness
-                else:
-                    time.sleep(0.1)
-
-            # action = self.check_buttons()
-            # if action == 'back':
-            #     return 'back', self.serial_module.current_brightness
-            # elif action == 'confirm':
-            #     # Save the new brightness
-            #     return 'confirm', self.current_brightness
-
-    # horizontal bar
-    # def create_brightness_image(self):
-    #     if self.font is None:
-    #         return None
-        
-    #     image = Image.new('RGB', self.display_size, self.background_color)
-    #     draw = ImageDraw.Draw(image)
-
-    #     # Draw brightness icon and text
-    #     icon_size = 28
-    #     icon_x = self.display_size[0] // 2 - icon_size // 2
-    #     icon_y = 180
-    #     self.draw_icon(draw, (icon_x, icon_y))
-        
-    #     small_font = ImageFont.truetype(self.font_path, 12)
-    #     text = "輝度"
-    #     text_bbox = draw.textbbox((0, 0), text, font=small_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     text_x = self.display_size[0] // 2 - text_width // 2
-    #     text_y = icon_y + icon_size + 5
-    #     draw.text((text_x, text_y), text, font=small_font, fill=self.text_color)
-
-    #     # Draw horizontal brightness bar
-    #     bar_height = 20
-    #     bar_width = 125
-    #     bar_x = (self.display_size[0] - bar_width) // 2
-    #     bar_y = self.display_size[1] // 2 - bar_height // 2
-    #     draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
-    #     filled_width = int(bar_width * self.current_brightness)
-    #     draw.rectangle([bar_x, bar_y, bar_x + filled_width, bar_y + bar_height], fill=self.highlight_color)
-
-    #     # Draw vertical slider bar
-    #     slider_width = 4
-    #     slider_height = 40
-    #     slider_x = bar_x + filled_width - slider_width // 2
-    #     slider_y = bar_y - (slider_height - bar_height) // 2
-    #     draw.rectangle([slider_x, slider_y, 
-    #                     slider_x + slider_width, slider_y + slider_height], 
-    #                 fill=self.text_color)
-
-    #     # Draw brightness value in a circle
-    #     value_size = 28
-    #     value_x = self.display_size[0] // 2
-    #     value_y = bar_y - value_size // 2 - 10
-    #     draw.ellipse([value_x - value_size//2, value_y - value_size//2, 
-    #                   value_x + value_size//2, value_y + value_size//2], fill=self.text_color)
-    #     brightness_percentage = int(self.current_brightness * 100)
-    #     percentage_font = ImageFont.truetype(self.font_path, 15)
-    #     percentage_text = f"{brightness_percentage}"
-    #     text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     text_x = value_x - text_width // 2
-    #     text_y = value_y - text_height // 2
-    #     draw.text((text_x, text_y), percentage_text, font=percentage_font, fill=self.background_color)
-
-    #     # Draw navigation buttons
-    #     nav_font = ImageFont.truetype(self.font_path, 12)
-        
-    #     center_x = self.display_size[0] // 2
-    #     draw.polygon([(center_x - 10, 20), (center_x, 10), (center_x, 30)], fill=self.text_color)  # Left arrow
-    #     back_text = "戻る"
-    #     text_bbox = draw.textbbox((0, 0), back_text, font=nav_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     draw.text((center_x + 5, 20 - text_height // 2), back_text, font=nav_font, fill=self.text_color)
-        
-    #     draw.polygon([(center_x + 10, 220), (center_x, 210), (center_x, 230)], fill=self.text_color)  # Right arrow
-    #     confirm_text = "決定"
-    #     text_bbox = draw.textbbox((0, 0), confirm_text, font=nav_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     draw.text((center_x - text_width - 5, 220 - text_height // 2), confirm_text, font=nav_font, fill=self.text_color)
-    #     return image
+                    if buttons[3]:  # UP button
+                        self.current_brightness = min(1.0, self.current_brightness + 0.05)
+                        self.update_display()
+                        time.sleep(0.2)
+                    elif buttons[2]:  # DOWN button
+                        self.current_brightness = max(0.0, self.current_brightness - 0.05)
+                        self.update_display()
+                        time.sleep(0.2)
+                    elif buttons[1]:  # RIGHT button
+                        return 'confirm', self.current_brightness
+                    elif buttons[0]:  # LEFT button
+                        self.current_brightness = self.serial_module.current_brightness
+                        return 'back', self.serial_module.current_brightness
+                    else:
+                        time.sleep(0.1)
+            except KeyboardInterrupt:
+                logging.info("KeyboardInterrupt received. Going back...")
+                return 'clean', self.serial_module.current_brightness
+            except Exception as e:
+                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                return 'clean', self.serial_module.current_brightness

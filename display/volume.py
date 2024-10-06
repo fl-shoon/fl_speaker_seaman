@@ -172,10 +172,34 @@ class SettingVolume:
     def run(self):
         self.update_display()
         while True:
-            action = self.check_buttons()
-            if action == 'back':
-                self.current_volume = self.initial_volume
-                return 'back', self.current_volume
-            elif action == 'confirm':
-                return 'confirm', self.current_volume
-            time.sleep(0.1)
+            try:
+                input_data = self.serial_module.get_inputs()
+                if input_data and 'result' in input_data:
+                    result = input_data['result']
+                    buttons = result['buttons']
+
+                    if buttons[3]:  # UP button
+                        self.current_volume = min(1.0, self.current_volume + 0.05)
+                        self.update_display()
+                        time.sleep(0.2)
+                    elif buttons[2]:  # DOWN button
+                        self.current_volume = max(0.0, self.current_volume - 0.05)
+                        self.update_display()
+                        time.sleep(0.2)
+                    elif buttons[1]:  # RIGHT button
+                        return 'confirm', self.current_volume
+                    elif buttons[0]:  # LEFT button
+                        return 'back', self.initial_volume
+            except KeyboardInterrupt:
+                logging.info("KeyboardInterrupt received. Going back...")
+                return 'clean', self.initial_volume
+            except Exception as e:
+                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                return 'clean', self.initial_volume
+            # action = self.check_buttons()
+            # if action == 'back':
+            #     self.current_volume = self.initial_volume
+            #     return 'back', self.current_volume
+            # elif action == 'confirm':
+            #     return 'confirm', self.current_volume
+            # time.sleep(0.1)
