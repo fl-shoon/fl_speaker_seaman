@@ -34,7 +34,6 @@ class DisplayModule:
         
         for i in range(steps):
             alpha = int(255 * (i + 1) / steps)
-            current_brightness = self.brightness * (i + 1) / steps
 
             faded_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             faded_img.paste(img, (0, 0))
@@ -43,10 +42,8 @@ class DisplayModule:
             rgb_img = Image.new("RGB", faded_img.size, (0, 0, 0))
             rgb_img.paste(faded_img, mask=faded_img.split()[3])
 
-            brightened_img = self.update_brightness(rgb_img, current_brightness)
-
             img_byte_arr = io.BytesIO()
-            brightened_img.save(img_byte_arr, format='PNG')
+            rgb_img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             self.serial_module.send_image_data(img_byte_arr)
@@ -58,12 +55,7 @@ class DisplayModule:
         
         frame_index = 0
         while mixer.music.get_busy():
-            frame = Image.open(io.BytesIO(all_frames[frame_index]))
-            brightened_frame = self.update_brightness(frame, self.brightness)
-            img_byte_arr = io.BytesIO()
-            brightened_frame.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
-            self.serial_module.send_image_data(img_byte_arr)
+            self.serial_module.send_image_data(all_frames[frame_index])
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
@@ -105,10 +97,5 @@ class DisplayModule:
             self.display_thread.join()
         self.serial_module.send_white_frames()
 
-    def update_brightness(self, image, brightnessValue=1.0):
-        enhancer = ImageEnhance.Brightness(image)
-        brightened_img = enhancer.enhance(brightnessValue)
-        return brightened_img
-    
     def send_white_frames(self):
         self.serial_module.send_white_frames()
