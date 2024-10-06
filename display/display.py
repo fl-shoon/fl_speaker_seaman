@@ -67,15 +67,6 @@ class DisplayModule:
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
 
-    # def display_gif(self, gif_path, stop_event):
-    #     frames = self.serial_module.prepare_gif(gif_path)
-    #     all_frames = self.serial_module.precompute_frames(frames)
-    #     frame_index = 0
-    #     while not stop_event.is_set():
-    #         self.serial_module.send_image_data(all_frames[frame_index])
-    #         frame_index = (frame_index + 1) % len(all_frames)
-    #         time.sleep(0.1)
-
     def display_image(self, image_path):
         try:
             # logger.info(f"Opening image: {image_path}")
@@ -91,6 +82,7 @@ class DisplayModule:
                 img = img.resize((240, 240))
                 # logger.info("Image resized to 240x240")
 
+            logger.info(f"=====-self.brightness: {self.brightness}-=====")
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
