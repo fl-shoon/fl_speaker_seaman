@@ -36,12 +36,19 @@ class SerialModule:
             message["params"] = params
         
         serial_connection.write(json.dumps(message).encode() + b'\n')
-        response = serial_connection.readline().decode().strip()
-        
         try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            logger.error(f"Failed to parse response: {response}")
+            response = serial_connection.readline().decode().strip()
+            
+            try:
+                return json.loads(response)
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse response: {response}")
+                return None
+        except serial.SerialException as e:
+            logger.error(f"Serial communication error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error in get_inputs: {e}")
             return None
 
     def send(self, data):
