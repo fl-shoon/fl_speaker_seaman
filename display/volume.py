@@ -153,8 +153,6 @@ class SettingVolume:
             if input_data and 'result' in input_data:
                 result = input_data['result']
                 buttons = result['buttons']
-                logging.info(f"audio player vol: {self.audio_player.current_volume}")
-                logging.info(f"current vol: {self.current_volume}")
 
                 if buttons[3]:  # UP button
                     self.current_volume = min(1.0, self.current_volume + 0.05)
@@ -167,7 +165,7 @@ class SettingVolume:
                 elif buttons[1]:  # RIGHT button
                     return 'confirm', self.current_volume
                 elif buttons[0]:  # LEFT button
-                    logging.info(f"return this: {self.audio_player.current_volume}")
+                    self.current_volume = self.audio_player.current_volume
                     return 'back', self.audio_player.current_volume
                 else:
                     time.sleep(0.1)
