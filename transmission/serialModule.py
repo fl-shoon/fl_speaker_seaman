@@ -15,6 +15,9 @@ class SerialModule:
         self.current_image = None
         self.input_serial = serial.Serial(MCUPort, BautRate, timeout=1)
 
+    def set_brightness(self, brightness):
+        self.current_brightness = max(0.0, min(1.0, brightness))
+
     def open(self, tty):
         try:
             self.comm = serial.Serial(tty, self.baud_rate, timeout=0.1)
@@ -25,7 +28,7 @@ class SerialModule:
             logger.warning(f"Failed to open port: {e}")
         return self.isPortOpen
 
-    def sendCommand(self, method, params=None):
+    def send_mcu_command(self, method, params=None):
         serial_connection = self.input_serial  
         
         message = {"method": method}
@@ -45,7 +48,7 @@ class SerialModule:
         self.comm.write(data)
 
     def get_inputs(self):
-        return self.sendCommand("getInputs")
+        return self.send_mcu_command("getInputs")
 
     def send_text(self):
         self.send('test'.encode())
@@ -123,6 +126,10 @@ class SerialModule:
             
             time.sleep(0.05) 
 
+    def apply_brightness(self, img):
+        enhancer = ImageEnhance.Brightness(img)
+        return enhancer.enhance(self.current_brightness)
+    
     def send_white_frames(self, flash_delay=0.01, timeout=2):
         white_frame = np.full((240, 240, 3), 255, dtype=np.uint8)
         white_frame_bytes = self.frame_to_bytes(white_frame)

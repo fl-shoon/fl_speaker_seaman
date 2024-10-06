@@ -75,7 +75,8 @@ class SettingMenu:
                     action, new_brightness = self.brightness_control.run()
                     if action == 'confirm':
                         self.brightness = new_brightness
-                        self.serial_module.set_brightness_image(self.brightness)
+                        # self.serial_module.set_brightness_image(self.brightness)
+                        self.update_display()
                         logger.info(f"Brightness updated to {self.brightness:.2f}")
                     else:
                         logger.info("Brightness adjustment cancelled")

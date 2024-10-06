@@ -133,12 +133,14 @@ class VoiceAssistant:
                 current_time = time.time()
                 if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
-                    logger.info(f"response: {res}, brightness: {brightness}")
+                    
                     if brightness is not None: 
                         self.brightness = brightness
-                        self.display.set_brightness(brightness)
+                        self.serial_module.set_brightness(brightness)
                     if res == 'exit':
+                        logger.info(f"response: {res}, brightness: {brightness}")
                         self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+                    
                     last_button_check_time = current_time
 
         except Exception as e:

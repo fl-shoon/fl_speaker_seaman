@@ -23,15 +23,7 @@ def suppress_stdout_stderr():
 class DisplayModule:
     def __init__(self, serial_module):
         self.serial_module = serial_module
-        self.brightness = 1.0
         self.fade_in_steps = 7
-
-    def set_brightness(self, brightness):
-        self.brightness = max(0.0, min(1.0, brightness))
-
-    def apply_brightness(self, img):
-        enhancer = ImageEnhance.Brightness(img)
-        return enhancer.enhance(self.brightness)
 
     def fade_in_logo(self, logo_path):
         img = Image.open(logo_path)
@@ -39,7 +31,7 @@ class DisplayModule:
         
         for i in range(self.fade_in_steps):
             alpha = int(255 * (i + 1) / self.fade_in_steps)
-            current_brightness = self.brightness * (i + 1) / self.fade_in_steps
+            current_brightness = self.serial_module.current_brightness * (i + 1) / self.fade_in_steps
 
             faded_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             faded_img.paste(img, (0, 0))
@@ -48,7 +40,8 @@ class DisplayModule:
             rgb_img = Image.new("RGB", faded_img.size, (0, 0, 0))
             rgb_img.paste(faded_img, mask=faded_img.split()[3])
 
-            brightened_img = self.apply_brightness(rgb_img)
+            enhancer = ImageEnhance.Brightness(rgb_img)
+            brightened_img = enhancer.enhance(current_brightness)
 
             img_byte_arr = io.BytesIO()
             brightened_img.save(img_byte_arr, format='PNG')
@@ -65,7 +58,7 @@ class DisplayModule:
         while mixer.music.get_busy():
             frame = Image.open(io.BytesIO(all_frames[frame_index]))
             
-            brightened_frame = self.apply_brightness(frame)
+            brightened_frame = self.serial_module.apply_brightness(frame)
             
             img_byte_arr = io.BytesIO()
             brightened_frame.save(img_byte_arr, format='PNG')
@@ -74,15 +67,6 @@ class DisplayModule:
             self.serial_module.send_image_data(img_byte_arr)
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
-    # def update_gif(self, gif_path):
-    #     frames = self.serial_module.prepare_gif(gif_path)
-    #     all_frames = self.serial_module.precompute_frames(frames)
-        
-    #     frame_index = 0
-    #     while mixer.music.get_busy():
-    #         self.serial_module.send_image_data(all_frames[frame_index])
-    #         frame_index = (frame_index + 1) % len(all_frames)
-    #         time.sleep(0.1)
 
     def display_image(self, image_path):
         try:
@@ -95,7 +79,7 @@ class DisplayModule:
             if (width, height) != (240, 240):
                 img = img.resize((240, 240))
 
-            brightened_img = self.apply_brightness(img)
+            brightened_img = self.serial_module.apply_brightness(img)
 
             img_byte_arr = io.BytesIO()
             brightened_img.save(img_byte_arr, format='PNG')
