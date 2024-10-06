@@ -198,8 +198,9 @@ class SerialModule:
 
     def frame_to_bytes(self, frame):
         img = Image.fromarray(frame)
+        brightened_img = self.apply_brightness(img)
         img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='PNG')
+        brightened_img.save(img_byte_arr, format='PNG')
         return img_byte_arr.getvalue()
 
     def precompute_frames(self, frames):
