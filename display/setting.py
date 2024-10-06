@@ -275,5 +275,5 @@ class SettingMenu:
                 logger.info("Returning to main app.")
                 return 'exit'
             if action == 'clean':
-                logger.info("Received clean.")
+                logger.info("Received clean from actions.")
                 return action

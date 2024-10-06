@@ -133,30 +133,23 @@ class SettingBrightness:
     def run(self):
         self.update_display()
         while True:
-            try:
-                input_data = self.serial_module.get_inputs()
-                if input_data and 'result' in input_data:
-                    result = input_data['result']
-                    buttons = result['buttons']
+            input_data = self.serial_module.get_inputs()
+            if input_data and 'result' in input_data:
+                result = input_data['result']
+                buttons = result['buttons']
 
-                    if buttons[3]:  # UP button
-                        self.current_brightness = min(1.0, self.current_brightness + 0.05)
-                        self.update_display()
-                        time.sleep(0.2)
-                    elif buttons[2]:  # DOWN button
-                        self.current_brightness = max(0.0, self.current_brightness - 0.05)
-                        self.update_display()
-                        time.sleep(0.2)
-                    elif buttons[1]:  # RIGHT button
-                        return 'confirm', self.current_brightness
-                    elif buttons[0]:  # LEFT button
-                        self.current_brightness = self.serial_module.current_brightness
-                        return 'back', self.serial_module.current_brightness
-                    else:
-                        time.sleep(0.1)
-            except KeyboardInterrupt:
-                logging.info("KeyboardInterrupt at Brightness Adjustment. Going back...")
-            except Exception as e:
-                logging.error(f"Error occurred at Brightness Adjustment: {e}", exc_info=True)
-            finally:
-                return 'clean', self.serial_module.current_brightness
+                if buttons[3]:  # UP button
+                    self.current_brightness = min(1.0, self.current_brightness + 0.05)
+                    self.update_display()
+                    time.sleep(0.2)
+                elif buttons[2]:  # DOWN button
+                    self.current_brightness = max(0.0, self.current_brightness - 0.05)
+                    self.update_display()
+                    time.sleep(0.2)
+                elif buttons[1]:  # RIGHT button
+                    return 'confirm', self.current_brightness
+                elif buttons[0]:  # LEFT button
+                    self.current_brightness = self.serial_module.current_brightness
+                    return 'back', self.serial_module.current_brightness
+                else:
+                    time.sleep(0.1)
