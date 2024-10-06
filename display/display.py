@@ -91,10 +91,16 @@ class DisplayModule:
                 img = img.resize((240, 240))
                 # logger.info("Image resized to 240x240")
 
-            brightened_img = self.update_brightness(img, self.brightness)
+            try:
+                brightened_img = self.update_brightness(img, self.brightness)
+            except Exception as e:
+                logger.info(e)
 
             img_byte_arr = io.BytesIO()
-            brightened_img.save(img_byte_arr, format='PNG')
+            if brightened_img:
+                brightened_img.save(img_byte_arr, format='PNG')
+            else:
+                img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
             # logger.info("Sending image to display...")
@@ -116,7 +122,7 @@ class DisplayModule:
             self.display_thread.join()
         self.serial_module.send_white_frames()
 
-    def update_brightness(self, image, brightnessValue):
+    def update_brightness(self, image, brightnessValue=0.1):
         enhancer = ImageEnhance.Brightness(image)
         brightened_img = enhancer.enhance(brightnessValue)
         return brightened_img
