@@ -60,49 +60,42 @@ class SettingMenu:
         return ImageFont.load_default()
     
     def check_inputs(self):
-        try:
-            inputs = self.serial_module.get_inputs()
-            if inputs and 'result' in inputs:
-                result = inputs['result']
-                buttons = result['buttons']
+        inputs = self.serial_module.get_inputs()
+        if inputs and 'result' in inputs:
+            result = inputs['result']
+            buttons = result['buttons']
 
-                if buttons[3]:  # UP button
-                    self.selected_item = max(0, self.selected_item - 1)
+            if buttons[3]:  # UP button
+                self.selected_item = max(0, self.selected_item - 1)
+                self.update_display()
+                time.sleep(0.2)
+            elif buttons[2]:  # DOWN button
+                self.selected_item = min(len(self.menu_items) - 1, self.selected_item + 1)
+                self.update_display()
+                time.sleep(0.2)
+            elif buttons[1]:  # RIGHT button
+                if self.selected_item == 0:  # Volume control
+                    action, new_volume = self.volume_control.run()
+                    if action == 'confirm':
+                        self.audio_player.set_audio_volume(new_volume)
+                        logger.info(f"Volume updated to {new_volume:.2f}")
+                    else:
+                        logger.info("Volume adjustment cancelled")
                     self.update_display()
-                    time.sleep(0.2)
-                elif buttons[2]:  # DOWN button
-                    self.selected_item = min(len(self.menu_items) - 1, self.selected_item + 1)
+                if self.selected_item == 1:  # Brightness control
+                    action, new_brightness = self.brightness_control.run()
+                    if action == 'confirm':
+                        self.brightness = new_brightness
+                        self.serial_module.set_brightness(new_brightness)
+                        logger.info(f"Brightness updated to {self.brightness:.2f}")
+                    else:
+                        logger.info("Brightness adjustment cancelled")
                     self.update_display()
-                    time.sleep(0.2)
-                elif buttons[1]:  # RIGHT button
-                    if self.selected_item == 0:  # Volume control
-                        action, new_volume = self.volume_control.run()
-                        if action == 'confirm':
-                            self.audio_player.set_audio_volume(new_volume)
-                            logger.info(f"Volume updated to {new_volume:.2f}")
-                        else:
-                            logger.info("Volume adjustment cancelled")
-                        self.update_display()
-                    if self.selected_item == 1:  # Brightness control
-                        action, new_brightness = self.brightness_control.run()
-                        if action == 'confirm':
-                            self.brightness = new_brightness
-                            self.serial_module.set_brightness(new_brightness)
-                            logger.info(f"Brightness updated to {self.brightness:.2f}")
-                        else:
-                            logger.info("Brightness adjustment cancelled")
-                        self.update_display()
-                    if self.selected_item == 4:  # 終了
-                        return 'back'
-                elif buttons[0]:  # LEFT button
+                if self.selected_item == 4:  # 終了
                     return 'back'
-            return None
-        except Exception as e:
-            logging.error(f"An unexpected error occurred: {e}", exc_info=True)
-            return 'clean'
-        except KeyboardInterrupt:
-            logging.info("KeyboardInterrupt received. Shutting down...")
-            return 'clean'
+            elif buttons[0]:  # LEFT button
+                return 'back'
+        return None
 
 
     def draw_icon(self, draw, icon, position, icon_color=(255, 255, 255)):
@@ -271,62 +264,9 @@ class SettingMenu:
     def display_menu(self):
         self.update_display()
         while True:
-            # try:
-            #     action = self.check_inputs()
-            #     if action == 'back':
-            #         logger.info("Returning to main app.")
-            #         return 'exit'
-            #     if action == 'clean':
-            #         return 'clean'
-            # except Exception as e:
-            #     logging.error(f"An unexpected error occurred: {e}", exc_info=True)
-            #     return 'clean'
-            # except KeyboardInterrupt:
-            #     logging.info("KeyboardInterrupt received. Shutting down...")
-            #     return 'clean'
-            try:
-                inputs = self.serial_module.get_inputs()
-                if inputs and 'result' in inputs:
-                    result = inputs['result']
-                    buttons = result['buttons']
-
-                    if buttons[3]:  # UP button
-                        self.selected_item = max(0, self.selected_item - 1)
-                        self.update_display()
-                        time.sleep(0.2)
-                    elif buttons[2]:  # DOWN button
-                        self.selected_item = min(len(self.menu_items) - 1, self.selected_item + 1)
-                        self.update_display()
-                        time.sleep(0.2)
-                    elif buttons[1]:  # RIGHT button
-                        if self.selected_item == 0:  # Volume control
-                            action, new_volume = self.volume_control.run()
-                            if action == 'confirm':
-                                self.audio_player.set_audio_volume(new_volume)
-                                logger.info(f"Volume updated to {new_volume:.2f}")
-                            else:
-                                logger.info("Volume adjustment cancelled")
-                            self.update_display()
-                        if self.selected_item == 1:  # Brightness control
-                            action, new_brightness = self.brightness_control.run()
-                            if action == 'confirm':
-                                self.brightness = new_brightness
-                                self.serial_module.set_brightness(new_brightness)
-                                logger.info(f"Brightness updated to {self.brightness:.2f}")
-                            else:
-                                logger.info("Brightness adjustment cancelled")
-                            self.update_display()
-                        if self.selected_item == 4:  # 終了
-                            logger.info("Returning to main app.")
-                            return 'exit'
-                    elif buttons[0]:  # LEFT button
-                        logger.info("Returning to main app.")
-                        return 'exit'
-                    time.sleep(0.2)
-            except Exception as e:
-                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+            action = self.check_inputs()
+            if action == 'back':
+                logger.info("Returning to main app.")
+                return 'exit'
+            if action == 'clean':
                 return 'clean'
-            except KeyboardInterrupt:
-                logging.info("KeyboardInterrupt received. Shutting down...")
-                return 'clean'
-            
