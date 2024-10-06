@@ -87,7 +87,6 @@ class SettingMenu:
                         action, new_brightness = self.brightness_control.run()
                         if action == 'confirm':
                             self.brightness = new_brightness
-                            # self.update_display()
                             self.serial_module.set_brightness(new_brightness)
                             logger.info(f"Brightness updated to {self.brightness:.2f}")
                         else:
@@ -272,10 +271,17 @@ class SettingMenu:
     def display_menu(self):
         self.update_display()
         while True:
-            action = self.check_inputs()
-            if action == 'back':
-                logger.info("Returning to main app.")
-                return 'exit'
-            if action == 'clean':
+            try:
+                action = self.check_inputs()
+                if action == 'back':
+                    logger.info("Returning to main app.")
+                    return 'exit'
+                if action == 'clean':
+                    return 'clean'
+            except Exception as e:
+                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+                return 'clean'
+            except KeyboardInterrupt:
+                logging.info("KeyboardInterrupt received. Shutting down...")
                 return 'clean'
             
