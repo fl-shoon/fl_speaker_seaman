@@ -323,7 +323,6 @@ class SettingMenu:
                         logger.info("Returning to main app.")
                         return 'exit'
                     time.sleep(0.2)
-                return None
             except Exception as e:
                 logging.error(f"An unexpected error occurred: {e}", exc_info=True)
                 return 'clean'
