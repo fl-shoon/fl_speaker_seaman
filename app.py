@@ -152,9 +152,10 @@ class VoiceAssistant:
         max_silence = 2
 
         while conversation_active and not exit_event.is_set():
+            logger.info(f"self.brightness: {self.brightness}")
             if self.brightness is None:
                 self.brightness = 1.0
-                
+
             if not self.ensure_serial_connection():
                 break
 
