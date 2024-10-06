@@ -44,7 +44,7 @@ class VoiceAssistant:
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
             self.audioPlayer = AudioPlayer(self.display)
-            self.setting_menu = SettingMenu(self.serial_module, self.volume)
+            self.setting_menu = SettingMenu(self.serial_module, self.audioPlayer)
             
             if not self.serial_module.open(USBPort):
                 # FIXME: Send a failure notice post request to server later

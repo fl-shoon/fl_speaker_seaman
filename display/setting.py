@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class SettingMenu:
-    def __init__(self, serial_module, volume):
+    def __init__(self, serial_module, audio_player):
         self.serial_module = serial_module
         self.input_serial = serial_module.input_serial
         
@@ -35,7 +35,8 @@ class SettingMenu:
         self.font = self.load_font()
 
         self.brightness = 1.0
-        self.volume = volume
+        self.volume = audio_player.current_volume
+        self.audio_player = audio_player
         self.brightness_control = SettingBrightness(serial_module, self.input_serial, self.brightness)
         self.volume_control = SettingVolume(serial_module, self.input_serial, self.volume)
         self.current_menu_image = None
@@ -76,8 +77,8 @@ class SettingMenu:
                 if self.selected_item == 0:  # Volume control
                     action, new_volume = self.volume_control.run()
                     if action == 'confirm':
-                        self.volume = new_volume
-                        logger.info(f"Volume updated to {self.volume:.2f}")
+                        self.audio_player.set_audio_volume(new_volume)
+                        logger.info(f"Volume updated to {new_volume:.2f}")
                     else:
                         logger.info("Volume adjustment cancelled")
                     self.update_display()

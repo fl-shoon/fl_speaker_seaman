@@ -27,7 +27,7 @@ class AudioPlayer:
         self.is_playing = mixer.music.get_busy()
         self.current_volume = 0.8
 
-    def set_brightness(self, volume):
+    def set_audio_volume(self, volume):
         self.current_volume = max(0.0, min(1.0, volume))
 
     def play_audio(self, filename):
