@@ -63,24 +63,37 @@ class DisplayModule:
         
         frame_index = 0
         while mixer.music.get_busy():
-            self.serial_module.send_image_data(all_frames[frame_index])
+            frame = Image.open(io.BytesIO(all_frames[frame_index]))
+            
+            brightened_frame = self.apply_brightness(frame)
+            
+            img_byte_arr = io.BytesIO()
+            brightened_frame.save(img_byte_arr, format='PNG')
+            img_byte_arr = img_byte_arr.getvalue()
+            
+            self.serial_module.send_image_data(img_byte_arr)
             frame_index = (frame_index + 1) % len(all_frames)
             time.sleep(0.1)
+    # def update_gif(self, gif_path):
+    #     frames = self.serial_module.prepare_gif(gif_path)
+    #     all_frames = self.serial_module.precompute_frames(frames)
+        
+    #     frame_index = 0
+    #     while mixer.music.get_busy():
+    #         self.serial_module.send_image_data(all_frames[frame_index])
+    #         frame_index = (frame_index + 1) % len(all_frames)
+    #         time.sleep(0.1)
 
     def display_image(self, image_path):
         try:
-            # logger.info(f"Opening image: {image_path}")
             img = Image.open(image_path)
             width, height = img.size
-            # logger.info(f"Image size: {width}x{height}")
 
-            # Convert image to RGB mode if it's not already
             if img.mode != 'RGB':
                 img = img.convert('RGB')
 
             if (width, height) != (240, 240):
                 img = img.resize((240, 240))
-                # logger.info("Image resized to 240x240")
 
             brightened_img = self.apply_brightness(img)
 
@@ -88,9 +101,7 @@ class DisplayModule:
             brightened_img.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
 
-            # logger.info("Sending image to display...")
             self.serial_module.send_image_data(img_byte_arr)
-            # logger.info("Image sent to display")
 
         except Exception as e:
             logger.warning(f"Error in display_image: {e}")

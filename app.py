@@ -134,8 +134,9 @@ class VoiceAssistant:
                 if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
                     logger.info(f"response: {res}, brightness: {brightness}")
-                    if brightness: self.brightness = brightness
-                    self.display.set_brightness(brightness)
+                    if brightness is not None: 
+                        self.brightness = brightness
+                        self.display.set_brightness(brightness)
                     if res == 'exit':
                         self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
                     last_button_check_time = current_time
@@ -194,17 +195,24 @@ class VoiceAssistant:
         self.audio_threadshold_calibration_done = False
 
     def check_buttons(self):
-        inputs = self.serial_module.get_inputs()
-        if inputs and 'result' in inputs:
-            result = inputs['result']
-            buttons = result['buttons']
+        try:
+            inputs = self.serial_module.get_inputs()
+            if inputs and 'result' in inputs:
+                result = inputs['result']
+                buttons = result.get('buttons', [])
 
-            if buttons[1]:  # RIGHT button
-                response = self.setting_menu.display_menu()
-                if response:
-                    return response
-                time.sleep(0.2)
-        return None, None
+                if len(buttons) > 1 and buttons[1]:  # RIGHT button
+                    response = self.setting_menu.display_menu()
+                    if response:
+                        new_response, new_brightness = response
+                        if new_brightness is not None:
+                            self.brightness = float(new_brightness)
+                        return new_response, self.brightness
+                    time.sleep(0.2)
+            return None, self.brightness
+        except Exception as e:
+            logger.error(f"Error in check_buttons: {e}")
+            return None, self.brightness
 
     def cleanup(self):
         logger.info("Starting cleanup process...")
