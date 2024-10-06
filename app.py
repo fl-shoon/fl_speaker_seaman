@@ -127,16 +127,17 @@ class VoiceAssistant:
                 
                 if wake_word_triggered:
                     logger.info("Wake word detected")
+                    logger.info(f"self.brightness: {self.brightness}")
                     self.audioPlayer.play_audio(ResponseAudio)
                     return True
                 
                 current_time = time.time()
                 if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
+                    logger.info(f"response: {res}, brightness: {brightness}")
                     if brightness: self.brightness = brightness
                     self.display.set_brightness(brightness)
                     if res == 'exit':
-                        logger.info(f"response: {res}, brightness: {brightness}")
                         self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
                     last_button_check_time = current_time
 
@@ -152,7 +153,6 @@ class VoiceAssistant:
         max_silence = 2
 
         while conversation_active and not exit_event.is_set():
-            logger.info(f"self.brightness: {self.brightness}")
             if self.brightness is None:
                 self.brightness = 1.0
 
