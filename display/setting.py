@@ -74,12 +74,9 @@ class SettingMenu:
             elif buttons[1]:  # RIGHT button
                 if self.selected_item == 0:  # Volume control
                     action, new_volume = self.volume_control.run()
-                    logger.info(f"volume action: {action}")
                     if action == 'confirm':
                         self.audio_player.set_audio_volume(new_volume)
                         logger.info(f"Volume updated to {new_volume:.2f}")
-                    elif action == 'back':
-                        self.audio_player.set_audio_volume(self.audio_player.current_volume)
                     elif action == 'clean':
                         logger.info(f"Volume Interrupt...")
                         return action
