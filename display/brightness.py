@@ -3,7 +3,7 @@ import io, time, math, logging, json
 
 logging.basicConfig(level=logging.INFO)
 
-class BrightnessModule:
+class SettingBrightness:
     def __init__(self, serial_module, mcu_module, initial_brightness=0.5):
         self.serial_module = serial_module
         self.input_serial = mcu_module

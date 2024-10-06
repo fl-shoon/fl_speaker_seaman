@@ -1,4 +1,4 @@
-from display.brightness import BrightnessModule
+from display.brightness import SettingBrightness
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 import io
@@ -34,7 +34,7 @@ class SettingMenu:
         self.font = self.load_font()
 
         self.brightness = brightness
-        self.brightness_control = BrightnessModule(serial_module, self.input_serial, self.brightness)
+        self.brightness_control = SettingBrightness(serial_module, self.input_serial, self.brightness)
         self.current_menu_image = None
 
     def load_font(self):
@@ -70,18 +70,27 @@ class SettingMenu:
                 self.update_display()
                 time.sleep(0.2)
             elif buttons[1]:  # RIGHT button
+                # if self.selected_item == 0:  # Volume control
+                #     action, new_brightness = self.brightness_control.run()
+                #     if action == 'confirm':
+                #         self.brightness = new_brightness
+                #         self.update_display()
+                #         logger.info(f"Brightness updated to {self.brightness:.2f}")
+                #     else:
+                #         logger.info("Brightness adjustment cancelled")
+                #     self.update_display()
                 if self.selected_item == 1:  # Brightness control
-                    self.serial_module.set_current_image(self.current_menu_image)
+                    # self.serial_module.set_current_image(self.current_menu_image)
                     action, new_brightness = self.brightness_control.run()
                     if action == 'confirm':
                         self.brightness = new_brightness
-                        # self.serial_module.set_brightness_image(self.brightness)
                         self.update_display()
                         logger.info(f"Brightness updated to {self.brightness:.2f}")
                     else:
                         logger.info("Brightness adjustment cancelled")
                     self.update_display()
-                time.sleep(0.2)
+                if self.selected_item == 4:  # 終了
+                    return 'back'
             elif buttons[0]:  # LEFT button
                 return 'back'
 
