@@ -107,20 +107,6 @@ class DisplayModule:
         self.serial_module.send_white_frames()
 
     def update_brightness(self, image, brightnessValue=1.0):
-        if brightness_value is None:
-            brightness_value = self.brightness
-
-        logger.info(f"brightness: {self.brightness}")
-        try:
-            brightness_value = float(brightness_value)
-            if brightness_value < 0:
-                brightness_value = 0
-            elif brightness_value > 1:
-                brightness_value = 1
-        except (ValueError, TypeError):
-            logger.warning(f"Invalid brightness value: {brightness_value}. Using default.")
-            brightness_value = 1.0
-
         enhancer = ImageEnhance.Brightness(image)
         brightened_img = enhancer.enhance(brightnessValue)
         return brightened_img
