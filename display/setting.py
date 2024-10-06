@@ -75,6 +75,7 @@ class SettingMenu:
             elif buttons[1]:  # RIGHT button
                 if self.selected_item == 0:  # Volume control
                     action, new_volume = self.volume_control.run()
+                    logger.info(f"Brightness action: {action}")
                     if action == 'confirm':
                         self.audio_player.set_audio_volume(new_volume)
                         logger.info(f"Volume updated to {new_volume:.2f}")
@@ -86,6 +87,7 @@ class SettingMenu:
                     self.update_display()
                 if self.selected_item == 1:  # Brightness control
                     action, new_brightness = self.brightness_control.run()
+                    logger.info(f"Brightness action: {action}")
                     if action == 'confirm':
                         self.serial_module.set_brightness(new_brightness)
                         logger.info(f"Brightness updated to {new_brightness:.2f}")
