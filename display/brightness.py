@@ -131,38 +131,32 @@ class SettingBrightness:
             y2 = y + center + int(size*0.42 * math.sin(math.radians(angle)))
             draw.line([x1, y1, x2, y2], fill=self.text_color, width=2)
 
-    def check_buttons(self):
-        input_data = self.serial_module.get_inputs()
-        if input_data and 'result' in input_data:
-            result = input_data['result']
-            buttons = result['buttons']
+    # def check_buttons(self):
+    #     input_data = self.serial_module.get_inputs()
+    #     if input_data and 'result' in input_data:
+    #         result = input_data['result']
+    #         buttons = result['buttons']
 
-            if buttons[3]:  # UP button
-                self.current_brightness = min(1.0, self.current_brightness + 0.05)
-                self.update_display()
-                time.sleep(0.2)
-                return 'adjust'
-            elif buttons[2]:  # DOWN button
-                self.current_brightness = max(0.0, self.current_brightness - 0.05)
-                self.update_display()
-                time.sleep(0.2)
-                return 'adjust'
-            elif buttons[1]:  # RIGHT button
-                return 'confirm'
-            elif buttons[0]:  # LEFT button
-                return 'back'
+    #         if buttons[3]:  # UP button
+    #             self.current_brightness = min(1.0, self.current_brightness + 0.05)
+    #             self.update_display()
+    #             time.sleep(0.2)
+    #             return 'adjust'
+    #         elif buttons[2]:  # DOWN button
+    #             self.current_brightness = max(0.0, self.current_brightness - 0.05)
+    #             self.update_display()
+    #             time.sleep(0.2)
+    #             return 'adjust'
+    #         elif buttons[1]:  # RIGHT button
+    #             return 'confirm'
+    #         elif buttons[0]:  # LEFT button
+    #             return 'back'
 
-        return None
+    #     return None
 
     def run(self):
         self.update_display()
         while True:
-            # action = self.check_buttons()
-            # if action == 'back':
-            #     return 'back', self.current_brightness
-            # elif action == 'confirm':
-            #     # Save the new brightness
-            #     return 'confirm', self.current_brightness
             input_data = self.serial_module.get_inputs()
             if input_data and 'result' in input_data:
                 result = input_data['result']
@@ -179,9 +173,17 @@ class SettingBrightness:
                 elif buttons[1]:  # RIGHT button
                     return 'confirm', self.current_brightness
                 elif buttons[0]:  # LEFT button
+                    self.current_brightness = self.serial_module.current_brightness
                     return 'back', self.serial_module.current_brightness
                 else:
                     time.sleep(0.1)
+
+            # action = self.check_buttons()
+            # if action == 'back':
+            #     return 'back', self.serial_module.current_brightness
+            # elif action == 'confirm':
+            #     # Save the new brightness
+            #     return 'confirm', self.current_brightness
 
     # horizontal bar
     # def create_brightness_image(self):
