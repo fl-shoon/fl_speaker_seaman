@@ -1,4 +1,5 @@
 from display.brightness import SettingBrightness
+from display.volume import SettingVolume
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 import io
@@ -10,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class SettingMenu:
-    def __init__(self, serial_module, brightness):
+    def __init__(self, serial_module, volume):
         self.serial_module = serial_module
         self.input_serial = serial_module.input_serial
         
@@ -33,8 +34,10 @@ class SettingMenu:
         self.selected_item = 1
         self.font = self.load_font()
 
-        self.brightness = brightness
+        self.brightness = 1.0
+        self.volume = volume
         self.brightness_control = SettingBrightness(serial_module, self.input_serial, self.brightness)
+        self.volume_control = SettingVolume(serial_module, self.input_serial, self.volume)
         self.current_menu_image = None
 
     def load_font(self):
@@ -70,21 +73,20 @@ class SettingMenu:
                 self.update_display()
                 time.sleep(0.2)
             elif buttons[1]:  # RIGHT button
-                # if self.selected_item == 0:  # Volume control
-                #     action, new_brightness = self.brightness_control.run()
-                #     if action == 'confirm':
-                #         self.brightness = new_brightness
-                #         self.update_display()
-                #         logger.info(f"Brightness updated to {self.brightness:.2f}")
-                #     else:
-                #         logger.info("Brightness adjustment cancelled")
-                #     self.update_display()
+                if self.selected_item == 0:  # Volume control
+                    action, new_volume = self.volume_control.run()
+                    if action == 'confirm':
+                        self.volume = new_volume
+                        logger.info(f"Volume updated to {self.volume:.2f}")
+                    else:
+                        logger.info("Volume adjustment cancelled")
+                    self.update_display()
                 if self.selected_item == 1:  # Brightness control
-                    # self.serial_module.set_current_image(self.current_menu_image)
                     action, new_brightness = self.brightness_control.run()
                     if action == 'confirm':
                         self.brightness = new_brightness
-                        self.update_display()
+                        # self.update_display()
+                        self.serial_module.set_brightness(new_brightness)
                         logger.info(f"Brightness updated to {self.brightness:.2f}")
                     else:
                         logger.info("Brightness adjustment cancelled")
@@ -265,5 +267,5 @@ class SettingMenu:
             action = self.check_inputs()
             if action == 'back':
                 logger.info("Returning to main app.")
-                return 'exit', self.brightness
+                return 'exit'
             time.sleep(0.1)

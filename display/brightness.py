@@ -44,7 +44,7 @@ class SettingBrightness:
         icon_size = 24
         icon_x = self.display_size[0] // 2 - icon_size // 2
         icon_y = 20
-        self.draw_icon(draw, 'brightness', (icon_x, icon_y))
+        self.draw_icon(draw, (icon_x, icon_y))
         
         small_font = ImageFont.truetype(self.font_path, 14)
         text = "輝度"
@@ -108,7 +108,7 @@ class SettingBrightness:
     #     icon_size = 28
     #     icon_x = self.display_size[0] // 2 - icon_size // 2
     #     icon_y = 180
-    #     self.draw_icon(draw, 'brightness', (icon_x, icon_y))
+    #     self.draw_icon(draw, (icon_x, icon_y))
         
     #     small_font = ImageFont.truetype(self.font_path, 12)
     #     text = "輝度"
@@ -185,28 +185,27 @@ class SettingBrightness:
 
         self.serial_module.send_image_data(img_byte_arr)
 
-    def draw_icon(self, draw, icon, position):
+    def draw_icon(self, draw, position):
         x, y = position
         size = 24  
 
-        if icon == 'brightness':
-            # Half-filled sun icon
-            center = size // 2
-            
-            # Draw the full circle outline
-            draw.ellipse([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], outline=self.text_color, width=2)
-            
-            # Fill the left half of the circle
-            draw.pieslice([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], start=90, end=270, fill=self.text_color)
-            
-            # Draw the rays
-            for i in range(8):
-                angle = i * 45
-                x1 = x + center + int(size*0.58 * math.cos(math.radians(angle)))
-                y1 = y + center + int(size*0.58 * math.sin(math.radians(angle)))
-                x2 = x + center + int(size*0.42 * math.cos(math.radians(angle)))
-                y2 = y + center + int(size*0.42 * math.sin(math.radians(angle)))
-                draw.line([x1, y1, x2, y2], fill=self.text_color, width=2)
+        # Half-filled sun icon
+        center = size // 2
+        
+        # Draw the full circle outline
+        draw.ellipse([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], outline=self.text_color, width=2)
+        
+        # Fill the left half of the circle
+        draw.pieslice([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], start=90, end=270, fill=self.text_color)
+        
+        # Draw the rays
+        for i in range(8):
+            angle = i * 45
+            x1 = x + center + int(size*0.58 * math.cos(math.radians(angle)))
+            y1 = y + center + int(size*0.58 * math.sin(math.radians(angle)))
+            x2 = x + center + int(size*0.42 * math.cos(math.radians(angle)))
+            y2 = y + center + int(size*0.42 * math.sin(math.radians(angle)))
+            draw.line([x1, y1, x2, y2], fill=self.text_color, width=2)
 
     def command(self, method, params=None, serial_connection=None):
         if serial_connection is None:

@@ -1,18 +1,18 @@
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-import io, time, math, logging, json
+from PIL import Image, ImageDraw, ImageFont
+import io, time, logging, json
 
 logging.basicConfig(level=logging.INFO)
 
 class SettingVolume:
-    def __init__(self, serial_module, mcu_module, initial_brightness=0.5):
+    def __init__(self, serial_module, mcu_module, initial_volume=0.5):
         self.serial_module = serial_module
         self.input_serial = mcu_module
         self.background_color = (73, 80, 87)
         self.text_color = (255, 255, 255)
         self.highlight_color = (0, 119, 255)
         self.display_size = (240, 240)
-        self.initial_brightness = initial_brightness
-        self.current_brightness = initial_brightness
+        self.initial_volume = initial_volume
+        self.current_volume = initial_volume
         self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
         self.font = self.load_font()
 
@@ -33,7 +33,7 @@ class SettingVolume:
         logging.error("Could not load any fonts. Using default font.")
         return None
     
-    def create_brightness_image(self):
+    def create_volume_image(self):
         if self.font is None:
             return None
         
@@ -44,10 +44,10 @@ class SettingVolume:
         icon_size = 24
         icon_x = self.display_size[0] // 2 - icon_size // 2
         icon_y = 20
-        self.draw_icon(draw, 'brightness', (icon_x, icon_y))
+        self.draw_icon(draw, (icon_x, icon_y))
         
         small_font = ImageFont.truetype(self.font_path, 14)
-        text = "輝度"
+        text = "音量"
         text_bbox = draw.textbbox((0, 0), text, font=small_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_x = self.display_size[0] // 2 - text_width // 2
@@ -59,7 +59,7 @@ class SettingVolume:
         bar_x = (self.display_size[0] - bar_width) // 2
         bar_y = 80
         draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
-        filled_height = int(bar_height * self.current_brightness)
+        filled_height = int(bar_height * self.current_volume)
         draw.rectangle([bar_x, bar_y + bar_height - filled_height, bar_x + bar_width, bar_y + bar_height], fill=self.highlight_color)
 
         # Draw white horizontal bar (slider)
@@ -75,9 +75,9 @@ class SettingVolume:
         value_x = bar_x + bar_width + 20
         value_y = slider_y + slider_height // 2
         draw.ellipse([value_x, value_y - value_size//2, value_x + value_size, value_y + value_size//2], fill=self.text_color)
-        brightness_percentage = int(self.current_brightness * 100)
+        volume_percentage = int(self.current_volume * 100)
         percentage_font = ImageFont.truetype(self.font_path, 14)
-        percentage_text = f"{brightness_percentage}"
+        percentage_text = f"{volume_percentage}"
         text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
@@ -96,117 +96,51 @@ class SettingVolume:
 
         return image
 
-    # horizontal bar
-    # def create_brightness_image(self):
-    #     if self.font is None:
-    #         return None
-        
-    #     image = Image.new('RGB', self.display_size, self.background_color)
-    #     draw = ImageDraw.Draw(image)
-
-    #     # Draw brightness icon and text
-    #     icon_size = 28
-    #     icon_x = self.display_size[0] // 2 - icon_size // 2
-    #     icon_y = 180
-    #     self.draw_icon(draw, 'brightness', (icon_x, icon_y))
-        
-    #     small_font = ImageFont.truetype(self.font_path, 12)
-    #     text = "輝度"
-    #     text_bbox = draw.textbbox((0, 0), text, font=small_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     text_x = self.display_size[0] // 2 - text_width // 2
-    #     text_y = icon_y + icon_size + 5
-    #     draw.text((text_x, text_y), text, font=small_font, fill=self.text_color)
-
-    #     # Draw horizontal brightness bar
-    #     bar_height = 20
-    #     bar_width = 125
-    #     bar_x = (self.display_size[0] - bar_width) // 2
-    #     bar_y = self.display_size[1] // 2 - bar_height // 2
-    #     draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height], outline=self.text_color)
-    #     filled_width = int(bar_width * self.current_brightness)
-    #     draw.rectangle([bar_x, bar_y, bar_x + filled_width, bar_y + bar_height], fill=self.highlight_color)
-
-    #     # Draw vertical slider bar
-    #     slider_width = 4
-    #     slider_height = 40
-    #     slider_x = bar_x + filled_width - slider_width // 2
-    #     slider_y = bar_y - (slider_height - bar_height) // 2
-    #     draw.rectangle([slider_x, slider_y, 
-    #                     slider_x + slider_width, slider_y + slider_height], 
-    #                 fill=self.text_color)
-
-    #     # Draw brightness value in a circle
-    #     value_size = 28
-    #     value_x = self.display_size[0] // 2
-    #     value_y = bar_y - value_size // 2 - 10
-    #     draw.ellipse([value_x - value_size//2, value_y - value_size//2, 
-    #                   value_x + value_size//2, value_y + value_size//2], fill=self.text_color)
-    #     brightness_percentage = int(self.current_brightness * 100)
-    #     percentage_font = ImageFont.truetype(self.font_path, 15)
-    #     percentage_text = f"{brightness_percentage}"
-    #     text_bbox = draw.textbbox((0, 0), percentage_text, font=percentage_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     text_x = value_x - text_width // 2
-    #     text_y = value_y - text_height // 2
-    #     draw.text((text_x, text_y), percentage_text, font=percentage_font, fill=self.background_color)
-
-    #     # Draw navigation buttons
-    #     nav_font = ImageFont.truetype(self.font_path, 12)
-        
-    #     center_x = self.display_size[0] // 2
-    #     draw.polygon([(center_x - 10, 20), (center_x, 10), (center_x, 30)], fill=self.text_color)  # Left arrow
-    #     back_text = "戻る"
-    #     text_bbox = draw.textbbox((0, 0), back_text, font=nav_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     draw.text((center_x + 5, 20 - text_height // 2), back_text, font=nav_font, fill=self.text_color)
-        
-    #     draw.polygon([(center_x + 10, 220), (center_x, 210), (center_x, 230)], fill=self.text_color)  # Right arrow
-    #     confirm_text = "決定"
-    #     text_bbox = draw.textbbox((0, 0), confirm_text, font=nav_font)
-    #     text_width = text_bbox[2] - text_bbox[0]
-    #     text_height = text_bbox[3] - text_bbox[1]
-    #     draw.text((center_x - text_width - 5, 220 - text_height // 2), confirm_text, font=nav_font, fill=self.text_color)
-    #     return image
-    
     def update_display(self):
-        image = self.create_brightness_image()
+        image = self.create_volume_image()
         
-        # Apply current brightness to the image
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(self.current_brightness)
-
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format='PNG')
         img_byte_arr = img_byte_arr.getvalue()
 
         self.serial_module.send_image_data(img_byte_arr)
 
-    def draw_icon(self, draw, icon, position):
+    def draw_icon(self, draw, position):
         x, y = position
         size = 24  
 
-        if icon == 'brightness':
-            # Half-filled sun icon
-            center = size // 2
-            
-            # Draw the full circle outline
-            draw.ellipse([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], outline=self.text_color, width=2)
-            
-            # Fill the left half of the circle
-            draw.pieslice([x+size*0.17, y+size*0.17, x+size*0.83, y+size*0.83], start=90, end=270, fill=self.text_color)
-            
-            # Draw the rays
-            for i in range(8):
-                angle = i * 45
-                x1 = x + center + int(size*0.58 * math.cos(math.radians(angle)))
-                y1 = y + center + int(size*0.58 * math.sin(math.radians(angle)))
-                x2 = x + center + int(size*0.42 * math.cos(math.radians(angle)))
-                y2 = y + center + int(size*0.42 * math.sin(math.radians(angle)))
-                draw.line([x1, y1, x2, y2], fill=self.text_color, width=2)
+        # Volume icon 
+        icon_width = size * 0.9  
+        icon_height = size * 0.9  
+        speaker_width = icon_width * 0.4
+        speaker_height = icon_height * 0.6
+
+        # Calculate positions
+        speaker_x = x + (size - speaker_width) // 2
+        speaker_y = y + (size - speaker_height) // 2
+
+        # Draw the speaker part
+        draw.polygon([
+            (speaker_x, speaker_y + speaker_height * 0.3),
+            (speaker_x + speaker_width * 0.6, speaker_y + speaker_height * 0.3),
+            (speaker_x + speaker_width, speaker_y),
+            (speaker_x + speaker_width, speaker_y + speaker_height),
+            (speaker_x + speaker_width * 0.6, speaker_y + speaker_height * 0.7),
+            (speaker_x, speaker_y + speaker_height * 0.7)
+        ], fill=(255, 255, 255))
+
+        # Draw the three arcs
+        arc_center_x = x + size * 0.7
+        arc_center_y = y + size // 2
+        for i in range(3):
+            arc_radius = size * (0.15 + i * 0.1)  
+            arc_bbox = [
+                arc_center_x - arc_radius,
+                arc_center_y - arc_radius,
+                arc_center_x + arc_radius,
+                arc_center_y + arc_radius
+            ]
+            draw.arc(arc_bbox, start=300, end=60, fill=(255, 255, 255), width=2)
 
     def command(self, method, params=None, serial_connection=None):
         if serial_connection is None:
@@ -235,12 +169,12 @@ class SettingVolume:
             buttons = result['buttons']
 
             if buttons[3]:  # UP button
-                self.current_brightness = min(1.0, self.current_brightness + 0.05)
+                self.current_volume = min(1.0, self.current_volume + 0.05)
                 self.update_display()
                 time.sleep(0.2)
                 return 'adjust'
             elif buttons[2]:  # DOWN button
-                self.current_brightness = max(0.0, self.current_brightness - 0.05)
+                self.current_volume = max(0.0, self.current_volume - 0.05)
                 self.update_display()
                 time.sleep(0.2)
                 return 'adjust'
@@ -252,17 +186,15 @@ class SettingVolume:
         return None
 
     def run(self):
-        image = self.create_brightness_image()
+        image = self.create_volume_image()
         if image is None:
-            return 'back', self.current_brightness
+            return 'back', self.current_volume
         self.update_display()
         while True:
             action = self.check_buttons()
             if action == 'back':
-                # Revert to initial brightness without saving
-                self.current_brightness = self.initial_brightness
-                return 'back', self.current_brightness
+                self.current_volume = self.initial_volume
+                return 'back', self.current_volume
             elif action == 'confirm':
-                # Save the new brightness
-                return 'confirm', self.current_brightness
+                return 'confirm', self.current_volume
             time.sleep(0.1)

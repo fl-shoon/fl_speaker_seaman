@@ -25,12 +25,16 @@ class AudioPlayer:
             pygame.init()
             mixer.init()
         self.is_playing = mixer.music.get_busy()
+        self.current_volume = 0.8
+
+    def set_brightness(self, volume):
+        self.current_volume = max(0.0, min(1.0, volume))
 
     def play_audio(self, filename):
         with suppress_stdout_stderr():
             mixer.music.load(filename)
             mixer.music.play()
-            mixer.music.set_volume(0.5)
+            mixer.music.set_volume(self.current_volume)
 
     def play_trigger_with_logo(self, trigger_audio, logo_path):
         self.play_audio(trigger_audio)

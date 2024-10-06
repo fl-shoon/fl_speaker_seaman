@@ -36,7 +36,7 @@ class VoiceAssistant:
         self.interactive_recorder = InteractiveRecorder()
         self.calibration_buffer = deque(maxlen=100)  
         self.energy_levels = deque(maxlen=100)
-        self.brightness = 1.0
+        self.volume = 1.0
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
@@ -44,7 +44,7 @@ class VoiceAssistant:
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
             self.audioPlayer = AudioPlayer(self.display)
-            self.setting_menu = SettingMenu(self.serial_module, self.brightness)
+            self.setting_menu = SettingMenu(self.serial_module, self.volume)
             
             if not self.serial_module.open(USBPort):
                 # FIXME: Send a failure notice post request to server later
@@ -132,13 +132,9 @@ class VoiceAssistant:
                 
                 current_time = time.time()
                 if current_time - last_button_check_time >= button_check_interval:
-                    res, brightness = self.check_buttons()
+                    res = self.check_buttons()
                     
-                    if brightness is not None: 
-                        self.brightness = brightness
-                        self.serial_module.set_brightness(brightness)
                     if res == 'exit':
-                        logger.info(f"response: {res}, brightness: {brightness}")
                         self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
                     
                     last_button_check_time = current_time
@@ -155,9 +151,6 @@ class VoiceAssistant:
         max_silence = 2
 
         while conversation_active and not exit_event.is_set():
-            if self.brightness is None:
-                self.brightness = 1.0
-
             if not self.ensure_serial_connection():
                 break
 
@@ -206,15 +199,13 @@ class VoiceAssistant:
                 if len(buttons) > 1 and buttons[1]:  # RIGHT button
                     response = self.setting_menu.display_menu()
                     if response:
-                        new_response, new_brightness = response
-                        if new_brightness is not None:
-                            self.brightness = float(new_brightness)
-                        return new_response, self.brightness
+                        new_response = response
+                        return new_response
                     time.sleep(0.2)
-            return None, self.brightness
+            return None
         except Exception as e:
             logger.error(f"Error in check_buttons: {e}")
-            return None, self.brightness
+            return None
 
     def cleanup(self):
         logger.info("Starting cleanup process...")
