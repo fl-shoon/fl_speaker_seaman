@@ -127,7 +127,6 @@ class VoiceAssistant:
                 
                 if wake_word_triggered:
                     logger.info("Wake word detected")
-                    logger.info(f"self.brightness: {self.brightness}")
                     self.audioPlayer.play_audio(ResponseAudio)
                     return True
                 
