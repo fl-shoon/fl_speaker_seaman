@@ -172,19 +172,16 @@ class SettingBrightness:
                     self.current_brightness = min(1.0, self.current_brightness + 0.05)
                     self.update_display()
                     time.sleep(0.2)
-                    # return 'adjust'
                 elif buttons[2]:  # DOWN button
                     self.current_brightness = max(0.0, self.current_brightness - 0.05)
                     self.update_display()
                     time.sleep(0.2)
-                    # return 'adjust'
                 elif buttons[1]:  # RIGHT button
                     return 'confirm', self.current_brightness
                 elif buttons[0]:  # LEFT button
-                    return 'back', self.current_brightness
+                    return 'back', self.serial_module.current_brightness
                 else:
                     time.sleep(0.1)
-                    # input_data = self.serial_module.get_inputs()
 
     # horizontal bar
     # def create_brightness_image(self):
