@@ -101,7 +101,7 @@ class SettingBrightness:
         
         # Apply current brightness to the image
         enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(self.serial_module.current_brightness)
+        image = enhancer.enhance(self.current_brightness)
 
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format='PNG')
