@@ -317,8 +317,10 @@ class SettingMenu:
                                 logger.info("Brightness adjustment cancelled")
                             self.update_display()
                         if self.selected_item == 4:  # 終了
-                            return 'back'
+                            logger.info("Returning to main app.")
+                            return 'exit'
                     elif buttons[0]:  # LEFT button
+                        logger.info("Returning to main app.")
                         return 'exit'
                 return None
             except Exception as e:
