@@ -131,7 +131,7 @@ class VoiceAssistant:
                     return True
                 
                 current_time = time.time()
-                if current_time - last_button_check_time >= button_check_interval:
+                if current_time - last_button_check_time >= button_check_interval and not wake_word_triggered:
                     res, brightness = self.check_buttons()
                     if brightness: self.brightness = brightness
                     self.display.set_brightness(brightness)
