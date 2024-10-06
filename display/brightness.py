@@ -11,7 +11,7 @@ class SettingBrightness:
         self.text_color = (255, 255, 255)
         self.highlight_color = (0, 119, 255)
         self.display_size = (240, 240)
-        self.initial_brightness = self.serial_module.current_brightness
+        # self.initial_brightness = self.serial_module.current_brightness
         self.current_brightness = self.serial_module.current_brightness
         self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
         self.font = self.load_font()
@@ -157,22 +157,15 @@ class SettingBrightness:
     def run(self):
         self.update_display()
         while True:
-            try:
-                action = self.check_buttons()
-                if action == 'back':
-                    # Revert to initial brightness without saving
-                    self.current_brightness = self.initial_brightness
-                    return 'back', self.current_brightness
-                elif action == 'confirm':
-                    # Save the new brightness
-                    return 'confirm', self.current_brightness
-                time.sleep(0.1)
-            except Exception as e:
-                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
-                return 'clean', self.current_brightness
-            except KeyboardInterrupt:
-                logging.info("KeyboardInterrupt received. Shutting down...")
-                return 'clean', self.current_brightness
+            action = self.check_buttons()
+            if action == 'back':
+                # Revert to initial brightness without saving
+                # self.current_brightness = self.initial_brightness
+                return 'back', self.current_brightness
+            elif action == 'confirm':
+                # Save the new brightness
+                return 'confirm', self.current_brightness
+            time.sleep(0.1)
 
     # horizontal bar
     # def create_brightness_image(self):

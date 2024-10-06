@@ -98,6 +98,7 @@ class SettingVolume:
 
     def update_display(self):
         image = self.create_volume_image()
+        logging.info(f"volume -> update_display -> {self.serial_module.current_brightness}")
 
         # Apply current brightness to the image
         enhancer = ImageEnhance.Brightness(image)
@@ -172,17 +173,10 @@ class SettingVolume:
     def run(self):
         self.update_display()
         while True:
-            try:
-                action = self.check_buttons()
-                if action == 'back':
-                    self.current_volume = self.initial_volume
-                    return 'back', self.current_volume
-                elif action == 'confirm':
-                    return 'confirm', self.current_volume
-                time.sleep(0.1)
-            except Exception as e:
-                logging.error(f"An unexpected error occurred: {e}", exc_info=True)
-                return 'clean', self.current_volume
-            except KeyboardInterrupt:
-                logging.info("KeyboardInterrupt received. Shutting down...")
-                return 'clean', self.current_volume
+            action = self.check_buttons()
+            if action == 'back':
+                self.current_volume = self.initial_volume
+                return 'back', self.current_volume
+            elif action == 'confirm':
+                return 'confirm', self.current_volume
+            time.sleep(0.1)
