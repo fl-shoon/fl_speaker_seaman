@@ -190,7 +190,7 @@ class VoiceAssistant:
                 self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
                 conversation_active = False
 
-        self.display.fade_in_logo(SeamanLogo, self.brightness)
+        self.display.fade_in_logo(SeamanLogo)
         self.audio_threadshold_calibration_done = False
 
     def check_buttons(self):
