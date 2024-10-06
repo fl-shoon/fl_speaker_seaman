@@ -34,7 +34,7 @@ class SettingMenu:
         self.selected_item = 1
         self.font = self.load_font()
 
-        self.brightness = 1.0
+        self.brightness = self.serial_module.current_brightness
         self.volume = audio_player.current_volume
         self.audio_player = audio_player
         self.brightness_control = SettingBrightness(serial_module, self.input_serial, self.brightness)
