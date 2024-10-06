@@ -1,5 +1,5 @@
-from PIL import Image, ImageDraw, ImageFont
-import io, time, logging, json
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+import io, time, logging
 
 logging.basicConfig(level=logging.INFO)
 
@@ -98,6 +98,10 @@ class SettingVolume:
 
     def update_display(self):
         image = self.create_volume_image()
+
+        # Apply current brightness to the image
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(self.serial_module.current_brightness)
         
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format='PNG')
@@ -166,9 +170,9 @@ class SettingVolume:
         return None
 
     def run(self):
-        image = self.create_volume_image()
-        if image is None:
-            return 'back', self.current_volume
+        # image = self.create_volume_image()
+        # if image is None:
+        #     return 'back', self.current_volume
         self.update_display()
         while True:
             try:

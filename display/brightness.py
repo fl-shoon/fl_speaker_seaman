@@ -155,9 +155,9 @@ class SettingBrightness:
         return None
 
     def run(self):
-        image = self.create_brightness_image()
-        if image is None:
-            return 'back', self.current_brightness
+        # image = self.create_brightness_image()
+        # if image is None:
+        #     return 'back', self.current_brightness
         self.update_display()
         while True:
             try:

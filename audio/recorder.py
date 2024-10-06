@@ -85,8 +85,8 @@ class InteractiveRecorder:
             energy_levels.append(energy)
         
         self.silence_energy = np.mean(energy_levels)
-        # if the recording has ended before speech, use larger value than 2.5
-        self.energy_threshold = self.silence_energy * 2.5 
+        # if the recording has ended before speech, use larger value than 3
+        self.energy_threshold = self.silence_energy * 3 
         # logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
         self.stop_stream()
 

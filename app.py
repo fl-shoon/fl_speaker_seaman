@@ -157,7 +157,7 @@ class VoiceAssistant:
                 break
 
             self.display.start_listening_display(SatoruHappy)
-            audio_data = self.interactive_recorder.record_question(silence_duration=1.5, max_duration=30, audio_player=self.audioPlayer)
+            audio_data = self.interactive_recorder.record_question(silence_duration=2, max_duration=30, audio_player=self.audioPlayer)
 
             if not audio_data:
                 silence_count += 1
