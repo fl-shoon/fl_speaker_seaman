@@ -4,15 +4,15 @@ import io, time, logging
 logging.basicConfig(level=logging.INFO)
 
 class SettingVolume:
-    def __init__(self, serial_module, mcu_module, initial_volume=0.5):
+    def __init__(self, serial_module, mcu_module, audio_player):
         self.serial_module = serial_module
         self.input_serial = mcu_module
         self.background_color = (73, 80, 87)
         self.text_color = (255, 255, 255)
         self.highlight_color = (0, 119, 255)
         self.display_size = (240, 240)
-        self.initial_volume = initial_volume
-        self.current_volume = initial_volume
+        self.audio_player = audio_player
+        self.current_volume = audio_player.current_volume
         self.font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
         self.font = self.load_font()
 
@@ -146,29 +146,6 @@ class SettingVolume:
             ]
             draw.arc(arc_bbox, start=300, end=60, fill=(255, 255, 255), width=2)
 
-    def check_buttons(self):
-        input_data = self.serial_module.get_inputs()
-        if input_data and 'result' in input_data:
-            result = input_data['result']
-            buttons = result['buttons']
-
-            if buttons[3]:  # UP button
-                self.current_volume = min(1.0, self.current_volume + 0.05)
-                self.update_display()
-                time.sleep(0.2)
-                return 'adjust'
-            elif buttons[2]:  # DOWN button
-                self.current_volume = max(0.0, self.current_volume - 0.05)
-                self.update_display()
-                time.sleep(0.2)
-                return 'adjust'
-            elif buttons[1]:  # RIGHT button
-                return 'confirm'
-            elif buttons[0]:  # LEFT button
-                return 'back'
-
-        return None
-
     def run(self):
         self.update_display()
         while True:
@@ -188,13 +165,6 @@ class SettingVolume:
                 elif buttons[1]:  # RIGHT button
                     return 'confirm', self.current_volume
                 elif buttons[0]:  # LEFT button
-                    return 'back', self.initial_volume
+                    return 'back', self.audio_player.current_volume
                 else:
                     time.sleep(0.1)
-            # action = self.check_buttons()
-            # if action == 'back':
-            #     self.current_volume = self.initial_volume
-            #     return 'back', self.current_volume
-            # elif action == 'confirm':
-            #     return 'confirm', self.current_volume
-            # time.sleep(0.1)
