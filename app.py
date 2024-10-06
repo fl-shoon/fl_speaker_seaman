@@ -133,7 +133,7 @@ class VoiceAssistant:
                 current_time = time.time()
                 if current_time - last_button_check_time >= button_check_interval:
                     res, brightness = self.check_buttons()
-                    self.brightness = brightness
+                    if brightness: self.brightness = brightness
                     self.display.set_brightness(brightness)
                     if res == 'exit':
                         logger.info(f"response: {res}, brightness: {brightness}")
