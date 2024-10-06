@@ -103,6 +103,8 @@ class SettingMenu:
         except KeyboardInterrupt:
             logging.info("KeyboardInterrupt received. Shutting down...")
             return 'clean'
+        
+        return None
 
 
     def draw_icon(self, draw, icon, position, icon_color=(255, 255, 255)):
