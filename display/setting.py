@@ -79,6 +79,7 @@ class SettingMenu:
                         self.audio_player.set_audio_volume(new_volume)
                         logger.info(f"Volume updated to {new_volume:.2f}")
                     elif action == 'clean':
+                        logger.info(f"Volume Interrupt...")
                         return action
                     else:
                         logger.info("Volume adjustment cancelled")
@@ -89,6 +90,7 @@ class SettingMenu:
                         self.serial_module.set_brightness(new_brightness)
                         logger.info(f"Brightness updated to {new_brightness:.2f}")
                     elif action == 'clean':
+                        logger.info(f"Brightness Interrupt...")
                         return action
                     else:
                         logger.info("Brightness adjustment cancelled")

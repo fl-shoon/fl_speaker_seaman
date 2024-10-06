@@ -36,7 +36,7 @@ class VoiceAssistant:
         self.interactive_recorder = InteractiveRecorder()
         self.calibration_buffer = deque(maxlen=100)  
         self.energy_levels = deque(maxlen=100)
-        self.volume = 1.0
+        self.volume = 0.5
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
