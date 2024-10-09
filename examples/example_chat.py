@@ -95,7 +95,6 @@ class OpenAIModule:
                     f.write(chunk)
         except OpenAIError as e:
             logging.error(f"Failed to generate speech: {e}")
-            self.fallback_text_to_speech(text, output_file)
 
     # def reset_conversation(self):
     #     self.conversation_history = [

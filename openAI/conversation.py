@@ -143,26 +143,5 @@ class OpenAIClient:
 
         except Exception as e:
             logger.error(f"Error in process_audio: {e}")
-            self.fallback_text_to_speech(AIOutputAudio)
+            self.audio_player.sync_audio_and_gif(ErrorAudio, SpeakingGif)
             return True
-
-    def fallback_text_to_speech(self, output_file: str):
-        duration = 1
-        frequency = 440
-        sample_rate = 44100
-
-        t = np.linspace(0, duration, int(sample_rate * duration), False)
-        audio = np.sin(2 * np.pi * frequency * t)
-        audio = (audio * 32767).astype(np.int16)
-
-        with wave.open(output_file, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(sample_rate)
-            wf.writeframes(audio.tobytes())
-
-        logger.info(f"Fallback audio saved to {output_file}")
-
-        self.audio_player.play_audio(output_file)
-
-        self.audio_player.sync_audio_and_gif(ErrorAudio, SpeakingGif)

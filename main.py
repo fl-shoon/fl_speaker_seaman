@@ -162,10 +162,7 @@ class VoiceAssistant:
                     conversation_active = False
             except Exception as e:
                 logger.error(f"Error processing conversation: {e}")
-                error_message = self.ai_client.handle_openai_error(e)
-                error_audio_file = ErrorAudio
-                self.ai_client.fallback_text_to_speech(error_message, error_audio_file)
-                sync_audio_and_gif(self.display, error_audio_file, SpeakingGif)
+                sync_audio_and_gif(self.display, ErrorAudio, SpeakingGif)
                 conversation_active = False
 
         self.display.fade_in_logo(SeamanLogo)
