@@ -1,0 +1,21 @@
+[Unit]
+Description=Seaman Display Settings
+After=multi-user.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/pi/seaman/seaman_speaker/hardware/runApp.sh
+WorkingDirectory=/home/pi/seaman/seaman_speaker/hardware
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=5
+User=pi
+Group=pi
+Environment=DISPLAY=:0
+Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+
+[Install]
+WantedBy=multi-user.target

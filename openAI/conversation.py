@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 from etc.define import *
 import numpy as np
 import logging
-import asyncio
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -144,16 +143,10 @@ class OpenAIClient:
 
         except Exception as e:
             logger.error(f"Error in process_audio: {e}")
-            error_message = await self.handle_openai_error(e)
-            output_audio_file = "assets/error_audio.wav"
-            self.fallback_text_to_speech(error_message, output_audio_file)
-            return output_audio_file, True
+            self.fallback_text_to_speech(AIOutputAudio)
+            return True
 
-    async def handle_openai_error(self, e: Exception) -> str:
-        logger.error(f"OpenAI API error: {e}")
-        return "申し訳ありませんが、エラーが発生しました。"
-
-    def fallback_text_to_speech(self, text: str, output_file: str):
+    def fallback_text_to_speech(self, output_file: str):
         duration = 1
         frequency = 440
         sample_rate = 44100
@@ -168,7 +161,8 @@ class OpenAIClient:
             wf.setframerate(sample_rate)
             wf.writeframes(audio.tobytes())
 
-        logger.warning(f"Fallback TTS used. Original message: {text}")
         logger.info(f"Fallback audio saved to {output_file}")
+
+        self.audio_player.play_audio(output_file)
 
         self.audio_player.sync_audio_and_gif(ErrorAudio, SpeakingGif)

@@ -1,4 +1,4 @@
-import speech_recognition as sr
+import speech_recognition as sr # SpeechRecognition
 import pyttsx3
 import pyaudio
 import wave
@@ -12,6 +12,7 @@ def speak(text):
 
 def record_audio(duration=10, sample_rate=44100, chunk=1024, channels=1):
     audio = pyaudio.PyAudio()
+    print("Listening... Speak your question.")
     stream = audio.open(format=pyaudio.paInt16,
                         channels=channels,
                         rate=sample_rate,
@@ -23,6 +24,7 @@ def record_audio(duration=10, sample_rate=44100, chunk=1024, channels=1):
         data = stream.read(chunk)
         frames.append(data)
 
+    print("10 seconds reached.")
     stream.stop_stream()
     stream.close()
     audio.terminate()

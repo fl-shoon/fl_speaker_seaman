@@ -1,15 +1,25 @@
 #!/bin/bash
 
-# Redirect output to a log file
+export $(env -i \
+    HOME="$HOME" \
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    USER="$USER" \
+    TERM="$TERM" \
+    LANG="en_GB.UTF-8" \
+    LC_CTYPE="UTF-8" \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+    PULSE_RUNTIME_PATH="$PULSE_RUNTIME_PATH" \
+    DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+    env | cut -d= -f1)
+
 exec > >(tee -a "/tmp/seaman_ai_speaker.log") 2>&1
 
 echo "Starting runApp.sh at $(date)"
 echo "Current user: $(whoami)"
 echo "Current directory: $(pwd)"
-echo "Environment variables:"
-env
+# echo "Environment variables:"
+# env
 
-# Start PulseAudio if it's not running
 if ! pulseaudio --check; then
     echo "Starting PulseAudio..."
     pulseaudio --start --exit-idle-time=-1 &
@@ -18,7 +28,6 @@ else
     echo "PulseAudio is already running."
 fi
 
-# Function to run setup
 run_setup() {
     echo "Running setup..."
     python3 setup.py
@@ -28,7 +37,6 @@ run_setup() {
     fi
 }
 
-# Function to clean up before exiting
 cleanup() {
     echo "Cleaning up..."
     if [ ! -z "$PYTHON_PID" ]; then
@@ -44,10 +52,8 @@ cleanup() {
     exit 0
 }
 
-# Set up trap to catch Ctrl+C and other termination signals
 trap cleanup SIGINT SIGTERM
 
-# Check if virtual environment exists
 if [ ! -d ".venv" ]; then
     run_setup
 else
@@ -59,19 +65,14 @@ else
     esac
 fi
 
-# Activate virtual environment
 source .venv/bin/activate
 
-# Export environment variables
 export OPENAI_API_KEY='key'
-# Add more environment variables:
-# export PICCO_ACCESS_KEY='another_key'
-# export CONFIG_PATH='/path/to/config'
+export PICO_ACCESS_KEY='another_key'
 
-# Function to run the main program
 run_main_program() {
     echo "Starting AI Speaker System..."
-    python3 debug.py &
+    python3 app.py &
     PYTHON_PID=$!
     wait $PYTHON_PID
     exit_code=$?
@@ -90,11 +91,8 @@ run_main_program() {
     fi
 }
 
-# Run the main program
 run_main_program
 
-# This point will be reached if the main program exits normally or is interrupted
 echo "AI Speaker System has shut down."
 
-# Clean up
 cleanup

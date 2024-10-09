@@ -20,6 +20,8 @@ Environment=HOME=/home/poi
 Environment=USER=poi
 TimeoutStopSec=60
 KillMode=mixed
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target

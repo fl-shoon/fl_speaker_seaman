@@ -10,5 +10,5 @@ def play_audio(file_path):
         pygame.time.Clock().tick(10)
 
 if __name__ == "__main__":
-    audio_file = "opening.wav"  
+    audio_file = "trigger.wav"  
     play_audio(audio_file)
