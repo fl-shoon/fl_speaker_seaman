@@ -91,10 +91,11 @@ class VoiceAssistant:
                     'brightnessSensor': f"{result['luminosity']:.2f}"
                 }
 
-                logger.info(f"Thermal: {result['thermal']:.2f}°C")
-                logger.info(f"IR Detect: {result['ir_detect']}")
-                logger.info(f"Luminosity: {result['luminosity']:.2f} lux")
-
+                '''
+                Thermal: 30.24°C
+                IR Detect: True
+                Luminosity: 20.00 lux
+                '''
 
                 if len(buttons) > 1 and buttons[1]:  # RIGHT button
                     response = self.setting_menu.display_menu()

@@ -69,8 +69,8 @@ source .venv/bin/activate
 
 export OPENAI_API_KEY='key'
 export PICO_ACCESS_KEY='another_key'
-export SPEAKER_ID = "CUXMYPcasUzPF11IaNSe"
-export SERVER_URL = "http://192.168.40.63:8080"
+export SPEAKER_ID='ABCDEFGHabcDEFG00HiJKl'
+export SERVER_URL='http://0.0.0.0:0000'
 
 run_main_program() {
     echo "Starting AI Speaker System..."
