@@ -35,7 +35,7 @@ class VoiceAssistant:
         self.energy_levels = deque(maxlen=100)
         self.volume = 0.5
         self.speaker_id = os.environ["SPEAKER_ID"]
-        self.server_url = os.environ["SPEAKER_ID"]
+        self.server_url = os.environ["SERVER_URL"]
         self.auth_token = None
         self.schedule = {}
         self.initialize(self.args.aiclient)
@@ -47,7 +47,7 @@ class VoiceAssistant:
             self.audioPlayer = AudioPlayer(self.display)
             self.setting_menu = SettingMenu(self.serial_module, self.audioPlayer)
             self.http_get = GetData(self.speaker_id, self.server_url)
-            self.http_put = PutData()
+            self.http_put = PutData(self.speaker_id, self.server_url)
             
             if not self.serial_module.open(USBPort):
                 # FIXME: Send a failure notice post request to server later
