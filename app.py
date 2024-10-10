@@ -100,8 +100,10 @@ class VoiceAssistant:
             while not exit_event.is_set():
                 current_time = time.time() # timestamp
                 if current_time - last_button_check_time >= button_check_interval:
-                    if self.auth_token: self.schedule = self.http_get.fetch_schedule()
                     detections = self.porcupine.process(audio_frame)
+
+                    time.sleep(0.5)
+                    if self.auth_token: self.schedule = self.http_get.fetch_schedule()
                     
                     res = self.check_buttons()
                     
