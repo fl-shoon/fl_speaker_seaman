@@ -1,14 +1,16 @@
 import requests
-from etc.define import *
+from etc.define import logger
 
 class GetData:
-    def __init__(self):
+    def __init__(self, id, url):
         self.token = None
+        self.speaker_id = id 
+        self.server_url = url
         self.fetch_auth_token()
 
     def fetch_auth_token(self):
-        headers = {"uid": DEVICE_ID}
-        response = requests.post(f"{SERVER_URL}/fetch_auth_token", headers=headers)
+        headers = {"uid": self.speaker_id}
+        response = requests.post(f"{self.server_url}/fetch_auth_token", headers=headers)
         if response.status_code == 200:
             self.token = response.json()['token']
             logger.info(f"Authentication token has been fetched: {self.token}")
@@ -18,7 +20,7 @@ class GetData:
     def fetch_schedule(self):
         if self.token:
             headers = {"Authorization": self.token}
-            response = requests.get(f"{SERVER_URL}/fetch_schedule", headers=headers)
+            response = requests.get(f"{self.server_url}/fetch_schedule", headers=headers)
             if response.status_code == 200:
                 return response.json()
             else:

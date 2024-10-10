@@ -2,8 +2,10 @@ import requests
 from etc.define import *
 
 class PutData:
-    def __init__(self):
+    def __init__(self, id, url):
         self.token = None
+        self.speaker_id = id 
+        self.server_url = url
         self.sensor_data_schema = {
             'temperatureSensor': int,
             'irSensor': bool,
@@ -23,8 +25,8 @@ class PutData:
     def update_sensor_data(self, token, data):
         invalid_fields = self.validate_data_types(data)
         if invalid_fields: return False
-        headers = {"Authorization": token, "uid": DEVICE_ID, "Content-Type": "application/json"}
-        response = requests.put(f"{SERVER_URL}/update_sensor_data", headers=headers, json=data)
+        headers = {"Authorization": token, "uid": self.speaker_id, "Content-Type": "application/json"}
+        response = requests.put(f"{self.server_url}/update_sensor_data", headers=headers, json=data)
         if response.status_code == 200:
             response_json = response.json()
             success = response_json['success']
