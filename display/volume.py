@@ -1,7 +1,9 @@
+from etc.define import logger
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-import io, time, logging
 
-logging.basicConfig(level=logging.INFO)
+import io
+import time
+
 
 class SettingVolume:
     def __init__(self, serial_module, mcu_module, audio_player):
@@ -28,9 +30,9 @@ class SettingVolume:
             try:
                 return ImageFont.truetype(font_path, 20)
             except IOError:
-                logging.warning(f"Could not load font: {font_path}")
+                logger.warning(f"Could not load font: {font_path}")
         
-        logging.error("Could not load any fonts. Using default font.")
+        logger.error("Could not load any fonts. Using default font.")
         return None
     
     def create_volume_image(self):

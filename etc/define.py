@@ -1,8 +1,16 @@
-import os, pyaudio
-import serial.tools.list_ports, logging
+from enum import Enum, auto
+
+import logging
+import os
+import pyaudio
+import serial.tools.list_ports
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# REST API Server 
+SERVER_URL = os.environ["SPEAKER_ID"]
+DEVICE_ID = os.environ["SERVER_URL"]
 
 # Get the current directory
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -111,3 +119,7 @@ def extract_device():
     return rp2040_port, pico_arduino_port 
 
 USBPort, MCUPort = extract_device()
+
+class WakeWorkType(str, Enum):
+    TRIGGER = auto()
+    SCHEDULE = auto()

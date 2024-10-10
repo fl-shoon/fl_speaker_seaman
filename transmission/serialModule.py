@@ -1,10 +1,11 @@
-import serial, time, io, logging, json
+from etc.define import BautRate, logger, MCUPort
 from PIL import Image, ImageEnhance
-import numpy as np
-from etc.define import *
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+import json
+import io
+import numpy as np
+import serial
+import time
 
 class SerialModule:
     def __init__(self, baud_rate='230400'):

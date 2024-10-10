@@ -1,14 +1,11 @@
 from display.brightness import SettingBrightness
 from display.volume import SettingVolume
+from etc.define import logger
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 import io
-import logging
 import math
 import time
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 class SettingMenu:
     def __init__(self, serial_module, audio_player):
@@ -52,9 +49,9 @@ class SettingMenu:
                 self.font_path = font_path
                 return ImageFont.truetype(font_path, 20)
             except IOError:
-                logging.warning(f"Could not load font: {font_path}")
+                logger.warning(f"Could not load font: {font_path}")
         
-        logging.error("Could not load any fonts. Using default font.")
+        logger.error("Could not load any fonts. Using default font.")
         return ImageFont.load_default()
     
     def check_inputs(self):

@@ -1,16 +1,14 @@
+from etc.define import CHANNELS, RATE
+from collections import deque
+from contextlib import contextmanager
+from scipy.signal import butter, lfilter
+
 import pyaudio
 import os
 import numpy as np
 import logging
 import tempfile
 import wave
-from scipy.signal import butter, lfilter
-from contextlib import contextmanager
-from collections import deque
-from etc.define import *
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 @contextmanager
 def suppress_stdout_stderr():

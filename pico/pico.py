@@ -1,8 +1,5 @@
+from etc.define import logger
 import pvporcupine 
-import logging
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 class PicoVoiceTrigger:
     def __init__(self, args):

@@ -1,6 +1,10 @@
-import pygame, threading, os, sys
-from pygame import mixer
 from contextlib import contextmanager
+from pygame import mixer
+
+import os
+import pygame
+import sys
+import threading
 
 @contextmanager
 def suppress_stdout_stderr():

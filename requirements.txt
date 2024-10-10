@@ -10,3 +10,4 @@ firebase-admin
 fastapi
 aiohttp
 uvicorn
+flask

@@ -1,15 +1,10 @@
-import os
-import json
-import wave
-import aiohttp
-from typing import List, Dict, AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
 from etc.define import *
-import numpy as np
-import logging
+from typing import List, Dict, AsyncGenerator
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+import aiohttp
+import json
+import os
 
 class OpenAIClient:
     def __init__(self):
@@ -17,7 +12,7 @@ class OpenAIClient:
         self.conversation_history: List[Dict[str, str]] = []
         self.max_retries = 3
         self.retry_delay = 5
-        self.session = None
+        self.http_client = None
         self.audio_player = None
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.gptContext = {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
@@ -26,14 +21,14 @@ class OpenAIClient:
                         ただし、ユーザーがさらに質問や話題を提供する場合は会話を続けてください。"""}
 
     async def initialize(self):
-        self.session = aiohttp.ClientSession()
+        self.http_client = aiohttp.ClientSession()
 
     def setAudioPlayer(self, audioPlayer):
         self.audio_player = audioPlayer
 
     async def close(self):
-        if self.session:
-            await self.session.close()
+        if self.http_client:
+            await self.http_client.close()
         self.executor.shutdown()
 
     async def service_openAI(self, endpoint: str, payload: Dict, files: Dict = None) -> AsyncGenerator[bytes, None]:
@@ -46,11 +41,11 @@ class OpenAIClient:
                 data.add_field(key, str(value))
             for key, (filename, file) in files.items():
                 data.add_field(key, file, filename=filename)
-            async with self.session.post(url, data=data, headers=headers) as response:
+            async with self.http_client.post(url, data=data, headers=headers) as response:
                 async for chunk in response.content.iter_chunks():
                     yield chunk[0]
         else:
-            async with self.session.post(url, json=payload, headers=headers) as response:
+            async with self.http_client.post(url, json=payload, headers=headers) as response:
                 async for chunk in response.content.iter_chunks():
                     yield chunk[0]
 
@@ -145,3 +140,29 @@ class OpenAIClient:
             logger.error(f"Error in process_audio: {e}")
             self.audio_player.sync_audio_and_gif(ErrorAudio, SpeakingGif)
             return True
+        
+    async def process_text(self, auto_text: str) -> tuple[str, bool]:
+        try:
+            # Generate response (Chat)
+            ai_response_text = ""
+            async for response_chunk in self.generate_ai_reply(auto_text):
+                ai_response_text += response_chunk
+
+            conversation_ended = '[END_OF_CONVERSATION]' in ai_response_text
+            ai_response_text = ai_response_text.replace('[END_OF_CONVERSATION]', '').strip()
+
+            logger.info(f"AI response: {ai_response_text}")
+            logger.info(f"Conversation ended: {conversation_ended}")
+
+            # Generate speech (TTS)
+            output_audio_file = AIOutputAudio
+            await self.text_to_speech(ai_response_text, output_audio_file)
+
+            # await asyncio.to_thread(self.audio_player.sync_audio_and_gif, output_audio_file, SpeakingGif)
+            self.audio_player.sync_audio_and_gif(output_audio_file, SpeakingGif)
+            return conversation_ended, output_audio_file
+
+        except Exception as e:
+            logger.error(f"Error in process_audio: {e}")
+            self.audio_player.sync_audio_and_gif(ErrorAudio, SpeakingGif)
+            return True, ErrorAudio

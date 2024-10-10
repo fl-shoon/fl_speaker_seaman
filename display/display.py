@@ -1,10 +1,11 @@
-import time, io, os, logging
+from etc.define import logger
+from contextlib import contextmanager
 from PIL import Image, ImageEnhance
 from pygame import mixer
-from contextlib import contextmanager
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+import io 
+import os
+import time
 
 @contextmanager
 def suppress_stdout_stderr():

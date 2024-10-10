@@ -1,7 +1,9 @@
+from etc.define import logger
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-import io, time, math, logging, json
 
-logging.basicConfig(level=logging.INFO)
+import io 
+import math
+import time 
 
 class SettingBrightness:
     def __init__(self, serial_module, mcu_module):
@@ -27,9 +29,9 @@ class SettingBrightness:
             try:
                 return ImageFont.truetype(font_path, 20)
             except IOError:
-                logging.warning(f"Could not load font: {font_path}")
+                logger.warning(f"Could not load font: {font_path}")
         
-        logging.error("Could not load any fonts. Using default font.")
+        logger.error("Could not load any fonts. Using default font.")
         return None
     
     def create_brightness_image(self):

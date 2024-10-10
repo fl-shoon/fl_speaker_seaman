@@ -1,3 +1,5 @@
+from apiService.service_get import GetData
+from apiService.service_put import PutData
 from audio.player import AudioPlayer
 from audio.recorder import InteractiveRecorder
 from collections import deque
@@ -8,19 +10,15 @@ from openAI.conversation import OpenAIClient
 from pvrecorder import PvRecorder
 from pico.pico import PicoVoiceTrigger
 from threading import Event
-from toshiba.toshiba import ToshibaVoiceTrigger, VTAPI_ParameterID
 from transmission.serialModule import SerialModule
 
 import argparse
 import asyncio
-import logging
+import datetime
 import numpy as np
 import signal
 import time
 import wave
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 exit_event = Event()
 
@@ -30,13 +28,14 @@ class VoiceAssistant:
         self.serial_module = None
         self.display = None
         self.recorder = None
-        self.vt = None
         self.porcupine = None
         self.ai_client = None
         self.interactive_recorder = InteractiveRecorder()
         self.calibration_buffer = deque(maxlen=100)  
         self.energy_levels = deque(maxlen=100)
         self.volume = 0.5
+        self.auth_token = None
+        self.schedule = {}
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
@@ -45,22 +44,18 @@ class VoiceAssistant:
             self.display = DisplayModule(self.serial_module)
             self.audioPlayer = AudioPlayer(self.display)
             self.setting_menu = SettingMenu(self.serial_module, self.audioPlayer)
+            self.http_get = GetData()
+            self.http_put = PutData()
             
             if not self.serial_module.open(USBPort):
                 # FIXME: Send a failure notice post request to server later
                 raise ConnectionError(f"Failed to open serial port {USBPort}")
 
-            self.ai_client = aiclient
-            try:
-                self.vt = ToshibaVoiceTrigger(self.args.vtdic)
-                self.vt.set_parameter(VTAPI_ParameterID.VTAPI_ParameterID_aThreshold, -1, self.args.threshold)
-                
-                self.recorder = PvRecorder(frame_length=self.vt.frame_size)
-            except Exception as e:
-                self.vt = None
-                logger.info("Failed to initialize toshiba. Using pico instead")
-                self.porcupine = PicoVoiceTrigger(self.args)
-                self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
+            self.auth_token = self.http_get.token
+            if self.auth_token: self.schedule = self.http_get.fetch_schedule()
+
+            self.porcupine = PicoVoiceTrigger(self.args)
+            self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
             
             logger.info("Voice Assistant initialized successfully")
         except Exception as e:
@@ -69,34 +64,24 @@ class VoiceAssistant:
             self.cleanup()
             raise
 
-    def ensure_serial_connection(self):
-        if not self.serial_module.isPortOpen:
-            logger.info("Serial connection closed. Attempting to reopen...")
-            for attempt in range(3):
-                if self.serial_module.open(USBPort):
-                    logger.info("Successfully reopened serial connection.")
-                    return True
-                logger.info(f"Attempt {attempt + 1} failed. Retrying in 1 second...")
-                time.sleep(1)
-            logger.error("Failed to reopen serial connection after 3 attempts.")
-            # FIXME: Send a failure notice post request to server later
-            return False
-        return True
+    def check_buttons(self):
+        try:
+            inputs = self.serial_module.get_inputs()
+            if inputs and 'result' in inputs:
+                result = inputs['result']
+                buttons = result.get('buttons', [])
 
-    def update_calibration(self, audio_data):
-        chunk = audio_data[:self.interactive_recorder.CHUNK_SIZE]
-        filtered_audio = self.interactive_recorder.butter_lowpass_filter(chunk, cutoff=1000, fs=RATE)
-        energy = np.sum(filtered_audio**2) / len(filtered_audio)
-        self.energy_levels.append(energy)
-
-    def perform_calibration(self):
-        if len(self.energy_levels) > 0:
-            self.interactive_recorder.silence_energy = np.mean(self.energy_levels)
-            self.interactive_recorder.energy_threshold = self.interactive_recorder.silence_energy * 2
-            # logger.info(f"Calibration updated. Silence energy: {self.interactive_recorder.silence_energy}, Threshold: {self.interactive_recorder.energy_threshold}")
-        else:
-            logger.warning("No energy data available for calibration")
-
+                if len(buttons) > 1 and buttons[1]:  # RIGHT button
+                    response = self.setting_menu.display_menu()
+                    if response:
+                        new_response = response
+                        return new_response
+                    time.sleep(0.2)
+            return None
+        except Exception as e:
+            logger.error(f"Error in check_buttons: {e}")
+            return None
+        
     def listen_for_wake_word(self):
         self.recorder.start()
         self.calibration_buffer.clear()
@@ -105,6 +90,10 @@ class VoiceAssistant:
         frames_since_last_calibration = 0
         last_button_check_time = time.time()
         button_check_interval = 1 # 1 -> check buttons every 1 seconds
+        
+        if self.schedule: 
+            hour = self.schedule['hour']
+            minute = self.schedule['minute']
 
         try:
             while not exit_event.is_set():
@@ -118,19 +107,21 @@ class VoiceAssistant:
                     self.perform_calibration()
                     frames_since_last_calibration = 0
 
-                if self.vt: 
-                    detections = self.vt.process(audio_data)
-                    wake_word_triggered = any(detections)
-                else: 
-                    detections = self.porcupine.process(audio_frame)
-                    wake_word_triggered = detections >= 0
+                detections = self.porcupine.process(audio_frame)
+                wake_word_triggered = detections >= 0
                 
                 if wake_word_triggered:
                     logger.info("Wake word detected")
                     self.audioPlayer.play_audio(ResponseAudio)
-                    return True
+                    return True, WakeWorkType.TRIGGER
                 
-                current_time = time.time()
+                now = datetime.datetime.now()
+
+                if hour and minute: 
+                    if now.hour == hour and now.minute == minute and now.second == 00:
+                        return True, WakeWorkType.SCHEDULE
+
+                current_time = time.time() # timestamp
                 if current_time - last_button_check_time >= button_check_interval:
                     res = self.check_buttons()
                     
@@ -153,7 +144,7 @@ class VoiceAssistant:
         max_silence = 2
 
         while conversation_active and not exit_event.is_set():
-            if not self.ensure_serial_connection():
+            if not self.serial_port_check():
                 break
 
             self.display.start_listening_display(SatoruHappy)
@@ -187,26 +178,83 @@ class VoiceAssistant:
                 conversation_active = False
 
         self.display.fade_in_logo(SeamanLogo)
-        self.audio_threadshold_calibration_done = False
 
-    def check_buttons(self):
-        try:
-            inputs = self.serial_module.get_inputs()
-            if inputs and 'result' in inputs:
-                result = inputs['result']
-                buttons = result.get('buttons', [])
+    async def scheduled_conversation(self):
+        conversation_active = True
+        silence_count = 0
+        max_silence = 2
+        text_initiation ="こんにちは"
+        input_audio_file = None
 
-                if len(buttons) > 1 and buttons[1]:  # RIGHT button
-                    response = self.setting_menu.display_menu()
-                    if response:
-                        new_response = response
-                        return new_response
-                    time.sleep(0.2)
-            return None
-        except Exception as e:
-            logger.error(f"Error in check_buttons: {e}")
-            return None
+        while conversation_active and not exit_event.is_set():
+            if not self.serial_port_check():
+                break
 
+            if input_audio_file:
+                self.display.start_listening_display(SatoruHappy)
+                audio_data = self.interactive_recorder.record_question(silence_duration=2, max_duration=30, audio_player=self.audioPlayer)
+
+                if not audio_data:
+                    silence_count += 1
+                    if silence_count >= max_silence:
+                        logger.info("Maximum silence reached. Ending conversation.")
+                        conversation_active = False
+                    continue
+                else:
+                    silence_count = 0
+
+                with wave.open(input_audio_file, 'wb') as wf:
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(2)
+                    wf.setframerate(RATE)
+                    wf.writeframes(audio_data)
+
+                self.display.stop_listening_display()
+
+            try:
+                if input_audio_file:
+                    conversation_ended = await self.ai_client.process_audio(input_audio_file)
+                else:
+                    conversation_ended, audio_file = await self.ai_client.process_text(text_initiation)
+                    input_audio_file = audio_file
+                    
+                if conversation_ended:
+                    conversation_active = False
+            except Exception as e:
+                logger.error(f"Error processing conversation: {e}")
+                self.audioPlayer.sync_audio_and_gif(ErrorAudio, SpeakingGif)
+                conversation_active = False
+
+        self.display.fade_in_logo(SeamanLogo)
+
+    def update_calibration(self, audio_data):
+        chunk = audio_data[:self.interactive_recorder.CHUNK_SIZE]
+        filtered_audio = self.interactive_recorder.butter_lowpass_filter(chunk, cutoff=1000, fs=RATE)
+        energy = np.sum(filtered_audio**2) / len(filtered_audio)
+        self.energy_levels.append(energy)
+
+    def perform_calibration(self):
+        if len(self.energy_levels) > 0:
+            self.interactive_recorder.silence_energy = np.mean(self.energy_levels)
+            self.interactive_recorder.energy_threshold = self.interactive_recorder.silence_energy * 3
+            # logger.info(f"Calibration updated. Silence energy: {self.interactive_recorder.silence_energy}, Threshold: {self.interactive_recorder.energy_threshold}")
+        else:
+            logger.warning("No energy data available for calibration")
+
+    def serial_port_check(self):
+        if not self.serial_module.isPortOpen:
+            logger.info("Serial connection closed. Attempting to reopen...")
+            for attempt in range(3):
+                if self.serial_module.open(USBPort):
+                    logger.info("Successfully reopened serial connection.")
+                    return True
+                logger.info(f"Attempt {attempt + 1} failed. Retrying in 1 second...")
+                time.sleep(1)
+            logger.error("Failed to reopen serial connection after 3 attempts.")
+            # FIXME: Send a failure notice post request to server later
+            return False
+        return True
+    
     def cleanup(self):
         logger.info("Starting cleanup process...")
         if self.recorder:
@@ -228,10 +276,6 @@ async def main():
     await aiClient.initialize()
 
     parser = argparse.ArgumentParser()
-    # Toshiba
-    parser.add_argument('--vtdic', help='Path to Toshiba Voice Trigger dictionary file', default=ToshibaVoiceDictionary)
-    parser.add_argument('--threshold', help='Threshold for keyword detection', type=int, default=600)
-    
     # Pico
     parser.add_argument('--access_key', help='AccessKey for Porcupine', default=os.environ["PICO_ACCESS_KEY"])
     parser.add_argument('--keyword_paths', nargs='+', help="Paths to keyword model files", default=[PicoWakeWordSatoru])
@@ -250,8 +294,11 @@ async def main():
         assistant.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not exit_event.is_set():
-            if assistant.listen_for_wake_word():
+            res, trigger_type = assistant.listen_for_wake_word()
+            if res and trigger_type == WakeWorkType.TRIGGER:
                 await assistant.process_conversation()
+            if res and trigger_type == WakeWorkType.SCHEDULE:
+                await assistant.scheduled_conversation()
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Shutting down...")
@@ -262,19 +309,6 @@ async def main():
         assistant.cleanup()
         
 if __name__ == '__main__':
-    '''
-    Set up a handler for a specific signal
-    signal.signal(params1, params2)
-
-    params1 : the signal number
-    params2 : the function to be called when the signal is received
-
-    SIGTERM(Signal Terminate) 
-    The standard signal for requesting a program to terminate
-
-    SIGINT (Signal Interrupt)
-    Typically sent when the user presses Ctrl+C
-    '''
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
 
