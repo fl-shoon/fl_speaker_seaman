@@ -76,7 +76,7 @@ class VoiceAssistant:
         if self.auth_token: self.schedule = self.http_get.fetch_schedule()
 
     def update_sensor_data(self):
-        if self.auth_token: self.http_put.update_sensor_data(self, self.auth_token, self.sensor_data)
+        if self.auth_token: self.http_put.update_sensor_data(self.auth_token, self.sensor_data)
 
     def check_buttons(self):
         try:
