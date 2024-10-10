@@ -94,6 +94,7 @@ class VoiceAssistant:
         button_check_interval = 1 # 1 -> check buttons every 1 seconds
         hour = None 
         minute = None
+        detections = -1
         
         try:
             while not exit_event.is_set():
