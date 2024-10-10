@@ -97,6 +97,20 @@ class VoiceAssistant:
         
         try:
             while not exit_event.is_set():
+                current_time = time.time() # timestamp
+                if current_time - last_button_check_time >= button_check_interval:
+                    if self.auth_token: self.schedule = self.http_get.fetch_schedule()
+                    detections = self.porcupine.process(audio_frame)
+                    
+                    res = self.check_buttons()
+                    
+                    if res == 'exit':
+                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+                    if res == 'clean':
+                        self.cleanup()
+                    
+                    last_button_check_time = current_time
+
                 audio_frame = self.recorder.read()
                 audio_data = np.array(audio_frame, dtype=np.int16)
 
@@ -107,7 +121,7 @@ class VoiceAssistant:
                     self.perform_calibration()
                     frames_since_last_calibration = 0
 
-                detections = self.porcupine.process(audio_frame)
+                # detections = self.porcupine.process(audio_frame)
                 wake_word_triggered = detections >= 0
                 
                 if wake_word_triggered:
@@ -121,27 +135,9 @@ class VoiceAssistant:
                     hour = self.schedule['hour']
                     minute = self.schedule['minute']
 
-                    logger.info(f"Fetched schedule : {self.schedule}")
-                    logger.info(f"Fetched data : hour : {hour} : minute : {minute}")
-
-                    logger.info(f"now.hour : {now.hour} : now.minute : {now.minute} : now.second : {now.second}")
-                    logger.info(f"now.hour == hour : {now.hour==hour} : now.minute == minute : {now.minute==minute} : now.second : {now.second == 00}")
-                
                 if hour and minute: 
                     if now.hour == hour and now.minute == minute and now.second == 00:
                         return True, WakeWorkType.SCHEDULE
-
-                current_time = time.time() # timestamp
-                if current_time - last_button_check_time >= button_check_interval:
-                    if self.auth_token: self.schedule = self.http_get.fetch_schedule()
-                    res = self.check_buttons()
-                    
-                    if res == 'exit':
-                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
-                    if res == 'clean':
-                        self.cleanup()
-                    
-                    last_button_check_time = current_time
 
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
