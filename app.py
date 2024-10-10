@@ -16,6 +16,7 @@ import argparse
 import asyncio
 import datetime
 import numpy as np
+import schedule
 import signal
 import time
 import wave
@@ -56,6 +57,8 @@ class VoiceAssistant:
             self.ai_client = aiclient
             self.auth_token = self.http_get.token
 
+            schedule.every(30).seconds.do(self.get_schedule)
+
             self.porcupine = PicoVoiceTrigger(self.args)
             self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
             
@@ -65,6 +68,9 @@ class VoiceAssistant:
             logger.error(f"Initialization error: {e}")
             self.cleanup()
             raise
+
+    def get_schedule(self):
+        if self.auth_token: self.schedule = self.http_get.fetch_schedule()
 
     def check_buttons(self):
         try:
@@ -91,29 +97,15 @@ class VoiceAssistant:
         calibration_interval = 50  # 50 -> frames
         frames_since_last_calibration = 0
         last_button_check_time = time.time()
-        button_check_interval = 1 # 1 -> check buttons every 1 seconds
+        wake_word_interval = 0.5 
+        button_check_interval = 1.5 # 1 -> check buttons every 1 seconds
         hour = None 
         minute = None
         detections = -1
         
         try:
             while not exit_event.is_set():
-                current_time = time.time() # timestamp
-                if current_time - last_button_check_time >= button_check_interval:
-                    detections = self.porcupine.process(audio_frame)
-
-                    time.sleep(0.5)
-                    if self.auth_token: self.schedule = self.http_get.fetch_schedule()
-                    
-                    res = self.check_buttons()
-                    
-                    if res == 'exit':
-                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
-                    if res == 'clean':
-                        self.cleanup()
-                    
-                    last_button_check_time = current_time
-
+                schedule.run_pending()
                 audio_frame = self.recorder.read()
                 audio_data = np.array(audio_frame, dtype=np.int16)
 
@@ -124,7 +116,7 @@ class VoiceAssistant:
                     self.perform_calibration()
                     frames_since_last_calibration = 0
 
-                # detections = self.porcupine.process(audio_frame)
+                detections = self.porcupine.process(audio_frame)
                 wake_word_triggered = detections >= 0
                 
                 if wake_word_triggered:
@@ -141,6 +133,17 @@ class VoiceAssistant:
                 if hour and minute: 
                     if now.hour == hour and now.minute == minute and now.second == 00:
                         return True, WakeWorkType.SCHEDULE
+                    
+                current_time = time.time() # timestamp
+                if current_time - last_button_check_time >= button_check_interval:
+                    res = self.check_buttons()
+                    
+                    if res == 'exit':
+                        self.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
+                    if res == 'clean':
+                        self.cleanup()
+                    
+                    last_button_check_time = current_time
 
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
