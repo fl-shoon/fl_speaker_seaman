@@ -6,7 +6,6 @@ from collections import deque
 from display.display import DisplayModule
 from display.setting import SettingMenu
 from etc.define import *
-from functools import partial
 from openAI.conversation import OpenAIClient
 from pvrecorder import PvRecorder
 from pico.pico import PicoVoiceTrigger
@@ -61,7 +60,7 @@ class VoiceAssistant:
             self.auth_token = self.http_get.token
 
             schedule.every(self.schedule_seconds).seconds.do(self.get_schedule)
-            schedule.every(50).seconds.do(partial(self.update_sensor_data, data=self.sensor_data))
+            schedule.every(50).seconds.do(self.update_sensor_data)
 
             self.porcupine = PicoVoiceTrigger(self.args)
             self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
@@ -76,8 +75,8 @@ class VoiceAssistant:
     def get_schedule(self):
         if self.auth_token: self.schedule = self.http_get.fetch_schedule()
 
-    def update_sensor_data(self, data):
-        if self.auth_token: self.http_put.update_sensor_data(self, self.auth_token, data)
+    def update_sensor_data(self):
+        if self.auth_token: self.http_put.update_sensor_data(self, self.auth_token, self.sensor_data)
 
     def check_buttons(self):
         try:
