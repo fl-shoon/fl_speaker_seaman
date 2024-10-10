@@ -22,6 +22,8 @@ class GetData:
             headers = {"Authorization": self.token}
             response = requests.get(f"{self.server_url}/fetch_schedule", headers=headers)
             if response.status_code == 200:
+                logger.info(f"Schedule has been fetched: {response.json()}")
                 return response.json()
             else:
                 logger.error(f"Failed to fetch schedule: {response.text}")
+                return {}

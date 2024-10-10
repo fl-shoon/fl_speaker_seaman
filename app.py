@@ -38,6 +38,8 @@ class VoiceAssistant:
         self.server_url = os.environ["SERVER_URL"]
         self.auth_token = None
         self.schedule = {}
+        self.http_get = GetData(self.speaker_id, self.server_url)
+        self.http_put = PutData(self.speaker_id, self.server_url)
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
@@ -46,8 +48,6 @@ class VoiceAssistant:
             self.display = DisplayModule(self.serial_module)
             self.audioPlayer = AudioPlayer(self.display)
             self.setting_menu = SettingMenu(self.serial_module, self.audioPlayer)
-            self.http_get = GetData(self.speaker_id, self.server_url)
-            self.http_put = PutData(self.speaker_id, self.server_url)
             
             if not self.serial_module.open(USBPort):
                 # FIXME: Send a failure notice post request to server later
@@ -98,6 +98,9 @@ class VoiceAssistant:
             hour = self.schedule['hour']
             minute = self.schedule['minute']
 
+        logger.info(f"Fetched schedule : {self.schedule}")
+        logger.info(f"Fetched data : hour : {hour} : minut : {minute}")
+        
         try:
             while not exit_event.is_set():
                 audio_frame = self.recorder.read()
@@ -119,6 +122,9 @@ class VoiceAssistant:
                     return True, WakeWorkType.TRIGGER
                 
                 now = datetime.datetime.now()
+
+                logger.info(f"now.hour : {now.hour} : now.minute : {now.minute} : now.second : {now.second}")
+                logger.info(f"now.hour == hour : {now.hour==hour} : now.minute == minute : {now.minute==minute} : now.second : {now.second == 00}")
 
                 if hour and minute: 
                     if now.hour == hour and now.minute == minute and now.second == 00:
