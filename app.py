@@ -115,15 +115,15 @@ class VoiceAssistant:
                 
                 now = datetime.datetime.now()
 
-                logger.info(f"now.hour : {now.hour} : now.minute : {now.minute} : now.second : {now.second}")
-                logger.info(f"now.hour == hour : {now.hour==hour} : now.minute == minute : {now.minute==minute} : now.second : {now.second == 00}")
-
                 if self.schedule: 
                     hour = self.schedule['hour']
                     minute = self.schedule['minute']
 
-                logger.info(f"Fetched schedule : {self.schedule}")
-                logger.info(f"Fetched data : hour : {hour} : minute : {minute}")
+                    logger.info(f"Fetched schedule : {self.schedule}")
+                    logger.info(f"Fetched data : hour : {hour} : minute : {minute}")
+
+                    logger.info(f"now.hour : {now.hour} : now.minute : {now.minute} : now.second : {now.second}")
+                    logger.info(f"now.hour == hour : {now.hour==hour} : now.minute == minute : {now.minute==minute} : now.second : {now.second == 00}")
                 
                 if hour and minute: 
                     if now.hour == hour and now.minute == minute and now.second == 00:
