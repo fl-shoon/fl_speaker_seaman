@@ -55,7 +55,6 @@ class VoiceAssistant:
 
             self.ai_client = aiclient
             self.auth_token = self.http_get.token
-            if self.auth_token: self.schedule = self.http_get.fetch_schedule()
 
             self.porcupine = PicoVoiceTrigger(self.args)
             self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
@@ -94,13 +93,6 @@ class VoiceAssistant:
         last_button_check_time = time.time()
         button_check_interval = 1 # 1 -> check buttons every 1 seconds
         
-        if self.schedule: 
-            hour = self.schedule['hour']
-            minute = self.schedule['minute']
-
-        logger.info(f"Fetched schedule : {self.schedule}")
-        logger.info(f"Fetched data : hour : {hour} : minut : {minute}")
-        
         try:
             while not exit_event.is_set():
                 audio_frame = self.recorder.read()
@@ -126,12 +118,20 @@ class VoiceAssistant:
                 logger.info(f"now.hour : {now.hour} : now.minute : {now.minute} : now.second : {now.second}")
                 logger.info(f"now.hour == hour : {now.hour==hour} : now.minute == minute : {now.minute==minute} : now.second : {now.second == 00}")
 
+                if self.schedule: 
+                    hour = self.schedule['hour']
+                    minute = self.schedule['minute']
+
+                logger.info(f"Fetched schedule : {self.schedule}")
+                logger.info(f"Fetched data : hour : {hour} : minute : {minute}")
+                
                 if hour and minute: 
                     if now.hour == hour and now.minute == minute and now.second == 00:
                         return True, WakeWorkType.SCHEDULE
 
                 current_time = time.time() # timestamp
                 if current_time - last_button_check_time >= button_check_interval:
+                    if self.auth_token: self.schedule = self.http_get.fetch_schedule()
                     res = self.check_buttons()
                     
                     if res == 'exit':
