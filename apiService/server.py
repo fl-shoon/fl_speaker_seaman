@@ -10,9 +10,9 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 DEVICE_SCHEMA = {
-    'temperatureSensor': int,
+    'temperatureSensor': str,
     'irSensor': bool,
-    'brightnessSensor': int,  
+    'brightnessSensor': str,  
 }
 
 def validate_data_types(data):

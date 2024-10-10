@@ -7,9 +7,9 @@ class PutData:
         self.speaker_id = id 
         self.server_url = url
         self.sensor_data_schema = {
-            'temperatureSensor': int,
+            'temperatureSensor': str,
             'irSensor': bool,
-            'brightnessSensor': int,  
+            'brightnessSensor': str,  
         }
 
     def validate_data_types(self, data):
@@ -24,13 +24,12 @@ class PutData:
 
     def update_sensor_data(self, token, data):
         invalid_fields = self.validate_data_types(data)
-        if invalid_fields: return False
+        if invalid_fields: return 
         headers = {"Authorization": token, "uid": self.speaker_id, "Content-Type": "application/json"}
         response = requests.put(f"{self.server_url}/update_sensor_data", headers=headers, json=data)
         if response.status_code == 200:
             response_json = response.json()
             success = response_json['success']
-            return success
+            logger.error(f"Success : {success} : Updated sensor data successfully: {response.text}")
         else:
-            logger.error(f"Failed to update Firestore data: {response.text}")
-            return False
+            logger.error(f"Failed to update sensor data: {response.text}")

@@ -6,6 +6,7 @@ from collections import deque
 from display.display import DisplayModule
 from display.setting import SettingMenu
 from etc.define import *
+from functools import partial
 from openAI.conversation import OpenAIClient
 from pvrecorder import PvRecorder
 from pico.pico import PicoVoiceTrigger
@@ -39,8 +40,10 @@ class VoiceAssistant:
         self.server_url = os.environ["SERVER_URL"]
         self.auth_token = None
         self.schedule = {}
+        self.schedule_seconds = 30
         self.http_get = GetData(self.speaker_id, self.server_url)
         self.http_put = PutData(self.speaker_id, self.server_url)
+        self.sensor_data = {}
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
@@ -57,7 +60,8 @@ class VoiceAssistant:
             self.ai_client = aiclient
             self.auth_token = self.http_get.token
 
-            schedule.every(30).seconds.do(self.get_schedule)
+            schedule.every(self.schedule_seconds).seconds.do(self.get_schedule)
+            schedule.every(50).seconds.do(partial(self.update_sensor_data, data=self.sensor_data))
 
             self.porcupine = PicoVoiceTrigger(self.args)
             self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
@@ -72,12 +76,26 @@ class VoiceAssistant:
     def get_schedule(self):
         if self.auth_token: self.schedule = self.http_get.fetch_schedule()
 
+    def update_sensor_data(self, data):
+        if self.auth_token: self.http_put.update_sensor_data(self, self.auth_token, data)
+
     def check_buttons(self):
         try:
             inputs = self.serial_module.get_inputs()
             if inputs and 'result' in inputs:
                 result = inputs['result']
                 buttons = result.get('buttons', [])
+
+                self.sensor_data = {
+                    'temperatureSensor': f"{result['thermal']:.2f}",
+                    'irSensor': result['ir_detect'],
+                    'brightnessSensor': f"{result['luminosity']:.2f}"
+                }
+
+                logger.info(f"Thermal: {result['thermal']:.2f}°C")
+                logger.info(f"IR Detect: {result['ir_detect']}")
+                logger.info(f"Luminosity: {result['luminosity']:.2f} lux")
+
 
                 if len(buttons) > 1 and buttons[1]:  # RIGHT button
                     response = self.setting_menu.display_menu()
@@ -97,7 +115,6 @@ class VoiceAssistant:
         calibration_interval = 50  # 50 -> frames
         frames_since_last_calibration = 0
         last_button_check_time = time.time()
-        wake_word_interval = 0.5 
         button_check_interval = 1.5 # 1 -> check buttons every 1 seconds
         hour = None 
         minute = None
@@ -131,7 +148,12 @@ class VoiceAssistant:
                     minute = self.schedule['minute']
 
                 if hour and minute: 
-                    if now.hour == hour and now.minute == minute and now.second == 00:
+                    scheduled_datetime = datetime.datetime.strptime(
+                        f"{hour}:{minute}:{00}", 
+                        "%H:%M:%S"
+                    ).replace(year=now.year, month=now.month, day=now.day)
+                    time_diff = abs((now - scheduled_datetime).total_seconds())
+                    if time_diff <= self.schedule_seconds:
                         return True, WakeWorkType.SCHEDULE
                     
                 current_time = time.time() # timestamp
