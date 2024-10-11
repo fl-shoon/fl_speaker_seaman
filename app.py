@@ -39,10 +39,10 @@ class VoiceAssistant:
         self.server_url = os.environ["SERVER_URL"]
         self.auth_token = None
         self.schedule = {}
+        self.schedule_update_interval = 5 * 60
         self.schedule_seconds = 30
         self.http_get = GetData(self.speaker_id, self.server_url)
         self.http_put = PutData(self.speaker_id, self.server_url)
-        # self.sensor_data = {}
         self.last_sensor_data = None
         self.initialize(self.args.aiclient)
 
@@ -61,7 +61,7 @@ class VoiceAssistant:
             self.auth_token = self.http_get.token
 
             self.get_schedule()
-            # schedule.every(self.schedule_seconds).seconds.do(self.get_schedule)
+            schedule.every(self.schedule_update_interval).seconds.do(self.get_schedule)
             schedule.every(self.schedule_seconds).seconds.do(self.update_sensor_data)
 
             self.porcupine = PicoVoiceTrigger(self.args)
@@ -76,6 +76,13 @@ class VoiceAssistant:
 
     # def get_schedule(self):
     #     if self.auth_token: self.schedule = self.http_get.fetch_schedule()
+    def get_schedule(self):
+        if self.auth_token:
+            new_schedule = self.http_get.fetch_schedule()
+            if new_schedule != self.schedule:
+                self.schedule = new_schedule
+                self.set_next_schedule_check()
+            logger.info("Schedule updated")
 
     def update_sensor_data(self):
         current_data = self.get_current_sensor_data()
@@ -136,21 +143,12 @@ class VoiceAssistant:
             }
         return {}
     
-    # def update_sensor_data(self):
-    #     if self.auth_token: self.http_put.update_sensor_data(self.auth_token, self.sensor_data)
-
     def check_buttons(self):
         try:
             inputs = self.serial_module.get_inputs()
             if inputs and 'result' in inputs:
                 result = inputs['result']
                 buttons = result.get('buttons', [])
-
-                # self.sensor_data = {
-                #     'temperatureSensor': f"{result['thermal']:.2f}",
-                #     'irSensor': result['ir_detect'],
-                #     'brightnessSensor': f"{result['luminosity']:.2f}"
-                # }
 
                 if len(buttons) > 1 and buttons[1]:  # RIGHT button
                     response = self.setting_menu.display_menu()
@@ -163,11 +161,6 @@ class VoiceAssistant:
             logger.error(f"Error in check_buttons: {e}")
             return None
         
-    def get_schedule(self):
-        if self.auth_token:
-            self.schedule = self.http_get.fetch_schedule()
-            self.set_next_schedule_check()
-
     def set_next_schedule_check(self):
         if not self.schedule:
             schedule.every(5).minutes.do(self.get_schedule)
@@ -186,6 +179,7 @@ class VoiceAssistant:
         
         schedule.clear('schedule_check')
         schedule.every(check_time).seconds.do(self.trigger_scheduled_conversation).tag('schedule_check')
+        logger.info(f"Next schedule set for {check_time} seconds from now")
 
     def trigger_scheduled_conversation(self):
         now = datetime.datetime.now()
