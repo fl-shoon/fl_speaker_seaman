@@ -42,7 +42,8 @@ class VoiceAssistant:
         self.schedule_seconds = 30
         self.http_get = GetData(self.speaker_id, self.server_url)
         self.http_put = PutData(self.speaker_id, self.server_url)
-        self.sensor_data = {}
+        # self.sensor_data = {}
+        self.last_sensor_data = None
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
@@ -59,8 +60,9 @@ class VoiceAssistant:
             self.ai_client = aiclient
             self.auth_token = self.http_get.token
 
-            schedule.every(self.schedule_seconds).seconds.do(self.get_schedule)
-            schedule.every(50).seconds.do(self.update_sensor_data)
+            self.get_schedule()
+            # schedule.every(self.schedule_seconds).seconds.do(self.get_schedule)
+            schedule.every(self.schedule_seconds).seconds.do(self.update_sensor_data)
 
             self.porcupine = PicoVoiceTrigger(self.args)
             self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
@@ -76,7 +78,66 @@ class VoiceAssistant:
         if self.auth_token: self.schedule = self.http_get.fetch_schedule()
 
     def update_sensor_data(self):
-        if self.auth_token: self.http_put.update_sensor_data(self.auth_token, self.sensor_data)
+        current_data = self.get_current_sensor_data()
+        if self.should_update_sensor_data(current_data):
+            if self.auth_token:
+                self.http_put.update_sensor_data(self.auth_token, current_data)
+            self.last_sensor_data = current_data
+
+    def should_update_sensor_data(self, current_data):
+        if not self.last_sensor_data:
+            return True
+        
+        thresholds = {
+            'temperatureSensor': 0.5,  
+            'irSensor': None,  
+            'brightnessSensor': 5.0  
+        }
+        
+        for key, threshold in thresholds.items():
+            if key not in self.last_sensor_data:
+                return True
+            
+            current_value = current_data.get(key)
+            last_value = self.last_sensor_data.get(key)
+            
+            if current_value is None or last_value is None:
+                return True
+            
+            if isinstance(current_value, bool):
+                if current_value != last_value:
+                    return True
+            else:
+                try:
+                    if abs(float(current_value) - float(last_value)) >= threshold:
+                        return True
+                except ValueError:
+                    if current_value != last_value:
+                        return True
+        
+        return False
+
+    def get_current_sensor_data(self):
+        inputs = self.serial_module.get_inputs()
+        if inputs and 'result' in inputs:
+            result = inputs['result']
+            
+            '''
+                # example of sensor results
+                Thermal: 30.24°C
+                IR Detect: True
+                Luminosity: 20.00 lux
+            '''
+            
+            return {
+                'temperatureSensor': f"{result['thermal']:.2f}",
+                'irSensor': result['ir_detect'],
+                'brightnessSensor': f"{result['luminosity']:.2f}"
+            }
+        return {}
+    
+    # def update_sensor_data(self):
+    #     if self.auth_token: self.http_put.update_sensor_data(self.auth_token, self.sensor_data)
 
     def check_buttons(self):
         try:
@@ -85,17 +146,11 @@ class VoiceAssistant:
                 result = inputs['result']
                 buttons = result.get('buttons', [])
 
-                self.sensor_data = {
-                    'temperatureSensor': f"{result['thermal']:.2f}",
-                    'irSensor': result['ir_detect'],
-                    'brightnessSensor': f"{result['luminosity']:.2f}"
-                }
-
-                '''
-                Thermal: 30.24°C
-                IR Detect: True
-                Luminosity: 20.00 lux
-                '''
+                # self.sensor_data = {
+                #     'temperatureSensor': f"{result['thermal']:.2f}",
+                #     'irSensor': result['ir_detect'],
+                #     'brightnessSensor': f"{result['luminosity']:.2f}"
+                # }
 
                 if len(buttons) > 1 and buttons[1]:  # RIGHT button
                     response = self.setting_menu.display_menu()
@@ -108,6 +163,41 @@ class VoiceAssistant:
             logger.error(f"Error in check_buttons: {e}")
             return None
         
+    def get_schedule(self):
+        if self.auth_token:
+            self.schedule = self.http_get.fetch_schedule()
+            self.set_next_schedule_check()
+
+    def set_next_schedule_check(self):
+        if not self.schedule:
+            schedule.every(5).minutes.do(self.get_schedule)
+            return
+
+        now = datetime.datetime.now()
+        scheduled_time = now.replace(hour=int(self.schedule['hour']), 
+                                     minute=int(self.schedule['minute']), 
+                                     second=0, microsecond=0)
+        
+        if scheduled_time <= now:
+            scheduled_time += datetime.timedelta(days=1)
+        
+        time_diff = (scheduled_time - now).total_seconds()
+        check_time = max(time_diff - 60, 60)  # Check 1 minute before schedule, but not less than 1 minute from now
+        
+        schedule.clear('schedule_check')
+        schedule.every(check_time).seconds.do(self.trigger_scheduled_conversation).tag('schedule_check')
+
+    def trigger_scheduled_conversation(self):
+        now = datetime.datetime.now()
+        scheduled_time = now.replace(hour=int(self.schedule['hour']), 
+                                     minute=int(self.schedule['minute']), 
+                                     second=0, microsecond=0)
+        
+        if abs((now - scheduled_time).total_seconds()) <= 60:  # Within 1 minute of scheduled time
+            self.scheduled_conversation_flag = True
+        else:
+            self.set_next_schedule_check()
+    
     def listen_for_wake_word(self):
         self.recorder.start()
         self.calibration_buffer.clear()
@@ -116,13 +206,19 @@ class VoiceAssistant:
         frames_since_last_calibration = 0
         last_button_check_time = time.time()
         button_check_interval = 1.5 # 1 -> check buttons every 1 seconds
-        hour = None 
-        minute = None
+        # hour = None 
+        # minute = None
         detections = -1
+
+        self.scheduled_conversation_flag = False
         
         try:
             while not exit_event.is_set():
                 schedule.run_pending()
+
+                if self.scheduled_conversation_flag:
+                    return True, WakeWorkType.SCHEDULE
+
                 audio_frame = self.recorder.read()
                 audio_data = np.array(audio_frame, dtype=np.int16)
 
@@ -141,20 +237,20 @@ class VoiceAssistant:
                     self.audioPlayer.play_audio(ResponseAudio)
                     return True, WakeWorkType.TRIGGER
                 
-                now = datetime.datetime.now()
+                # now = datetime.datetime.now()
 
-                if self.schedule: 
-                    hour = self.schedule['hour']
-                    minute = self.schedule['minute']
+                # if self.schedule: 
+                #     hour = self.schedule['hour']
+                #     minute = self.schedule['minute']
 
-                if hour and minute: 
-                    scheduled_datetime = datetime.datetime.strptime(
-                        f"{hour}:{minute}:{00}", 
-                        "%H:%M:%S"
-                    ).replace(year=now.year, month=now.month, day=now.day)
-                    time_diff = abs((now - scheduled_datetime).total_seconds())
-                    if time_diff <= self.schedule_seconds:
-                        return True, WakeWorkType.SCHEDULE
+                # if hour and minute: 
+                #     scheduled_datetime = datetime.datetime.strptime(
+                #         f"{hour}:{minute}:{00}", 
+                #         "%H:%M:%S"
+                #     ).replace(year=now.year, month=now.month, day=now.day)
+                #     time_diff = abs((now - scheduled_datetime).total_seconds())
+                #     if time_diff <= self.schedule_seconds:
+                #         return True, WakeWorkType.SCHEDULE
                     
                 current_time = time.time() # timestamp
                 if current_time - last_button_check_time >= button_check_interval:
