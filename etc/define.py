@@ -8,6 +8,10 @@ import serial.tools.list_ports
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# API variables
+SPEAKER_ID = os.environ["SPEAKER_ID"]
+SERVER_URL = os.environ["SERVER_URL"]
+
 # Get the current directory
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 

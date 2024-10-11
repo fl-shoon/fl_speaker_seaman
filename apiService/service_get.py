@@ -1,11 +1,11 @@
 import requests
-from etc.define import logger
+from etc.define import logger, SPEAKER_ID, SERVER_URL
 
 class GetData:
-    def __init__(self, id, url):
+    def __init__(self):
         self.token = None
-        self.speaker_id = id 
-        self.server_url = url
+        self.speaker_id = SPEAKER_ID 
+        self.server_url = SERVER_URL
         self.fetch_auth_token()
 
     def fetch_auth_token(self):

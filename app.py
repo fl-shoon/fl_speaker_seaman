@@ -31,23 +31,20 @@ class VoiceAssistant:
         self.recorder = None
         self.porcupine = None
         self.ai_client = None
-        self.interactive_recorder = InteractiveRecorder()
-        self.calibration_buffer = deque(maxlen=100)  
-        self.energy_levels = deque(maxlen=100)
         self.volume = 0.5
-        self.speaker_id = os.environ["SPEAKER_ID"]
-        self.server_url = os.environ["SERVER_URL"]
         self.auth_token = None
         self.schedule = {}
-        self.schedule_update_interval = 5 * 60
-        self.schedule_seconds = 30
-        self.http_get = GetData(self.speaker_id, self.server_url)
-        self.http_put = PutData(self.speaker_id, self.server_url)
+        self.schedule_update_interval = 3 * 60 # run schedule every 3 minutes
         self.last_sensor_data = None
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
         try:
+            self.http_get = GetData()
+            self.http_put = PutData()
+            self.interactive_recorder = InteractiveRecorder()
+            self.calibration_buffer = deque(maxlen=100)  
+            self.energy_levels = deque(maxlen=100)
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
             self.audioPlayer = AudioPlayer(self.display)
@@ -62,7 +59,7 @@ class VoiceAssistant:
 
             self.get_schedule()
             schedule.every(self.schedule_update_interval).seconds.do(self.get_schedule)
-            schedule.every(self.schedule_seconds).seconds.do(self.update_sensor_data)
+            schedule.every(self.schedule_update_interval).seconds.do(self.update_sensor_data)
 
             self.porcupine = PicoVoiceTrigger(self.args)
             self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
@@ -74,8 +71,6 @@ class VoiceAssistant:
             self.cleanup()
             raise
 
-    # def get_schedule(self):
-    #     if self.auth_token: self.schedule = self.http_get.fetch_schedule()
     def get_schedule(self):
         if self.auth_token:
             new_schedule = self.http_get.fetch_schedule()
@@ -83,6 +78,37 @@ class VoiceAssistant:
                 self.schedule = new_schedule
                 self.set_next_schedule_check()
             logger.info("Schedule updated")
+    
+    def set_next_schedule_check(self):
+        if not self.schedule:
+            schedule.every(5).minutes.do(self.get_schedule)
+            return
+
+        now = datetime.datetime.now()
+        scheduled_time = now.replace(hour=int(self.schedule['hour']), 
+                                     minute=int(self.schedule['minute']), 
+                                     second=0, microsecond=0)
+        
+        if scheduled_time <= now:
+            scheduled_time += datetime.timedelta(days=1)
+        
+        time_diff = (scheduled_time - now).total_seconds()
+        check_time = max(time_diff - 60, 60)  # Check 1 minute before schedule, but not less than 1 minute from now
+        
+        schedule.clear('schedule_check')
+        schedule.every(check_time).seconds.do(self.trigger_scheduled_conversation).tag('schedule_check')
+        logger.info(f"Next schedule set for {check_time} seconds from now")
+
+    def trigger_scheduled_conversation(self):
+        now = datetime.datetime.now()
+        scheduled_time = now.replace(hour=int(self.schedule['hour']), 
+                                     minute=int(self.schedule['minute']), 
+                                     second=0, microsecond=0)
+        
+        if abs((now - scheduled_time).total_seconds()) <= 60:  # Within 1 minute of scheduled time
+            self.scheduled_conversation_flag = True
+        else:
+            self.set_next_schedule_check()
 
     def update_sensor_data(self):
         current_data = self.get_current_sensor_data()
@@ -161,37 +187,6 @@ class VoiceAssistant:
             logger.error(f"Error in check_buttons: {e}")
             return None
         
-    def set_next_schedule_check(self):
-        if not self.schedule:
-            schedule.every(5).minutes.do(self.get_schedule)
-            return
-
-        now = datetime.datetime.now()
-        scheduled_time = now.replace(hour=int(self.schedule['hour']), 
-                                     minute=int(self.schedule['minute']), 
-                                     second=0, microsecond=0)
-        
-        if scheduled_time <= now:
-            scheduled_time += datetime.timedelta(days=1)
-        
-        time_diff = (scheduled_time - now).total_seconds()
-        check_time = max(time_diff - 60, 60)  # Check 1 minute before schedule, but not less than 1 minute from now
-        
-        schedule.clear('schedule_check')
-        schedule.every(check_time).seconds.do(self.trigger_scheduled_conversation).tag('schedule_check')
-        logger.info(f"Next schedule set for {check_time} seconds from now")
-
-    def trigger_scheduled_conversation(self):
-        now = datetime.datetime.now()
-        scheduled_time = now.replace(hour=int(self.schedule['hour']), 
-                                     minute=int(self.schedule['minute']), 
-                                     second=0, microsecond=0)
-        
-        if abs((now - scheduled_time).total_seconds()) <= 60:  # Within 1 minute of scheduled time
-            self.scheduled_conversation_flag = True
-        else:
-            self.set_next_schedule_check()
-    
     def listen_for_wake_word(self):
         self.recorder.start()
         self.calibration_buffer.clear()
@@ -200,8 +195,6 @@ class VoiceAssistant:
         frames_since_last_calibration = 0
         last_button_check_time = time.time()
         button_check_interval = 1.5 # 1 -> check buttons every 1 seconds
-        # hour = None 
-        # minute = None
         detections = -1
 
         self.scheduled_conversation_flag = False
@@ -231,21 +224,6 @@ class VoiceAssistant:
                     self.audioPlayer.play_audio(ResponseAudio)
                     return True, WakeWorkType.TRIGGER
                 
-                # now = datetime.datetime.now()
-
-                # if self.schedule: 
-                #     hour = self.schedule['hour']
-                #     minute = self.schedule['minute']
-
-                # if hour and minute: 
-                #     scheduled_datetime = datetime.datetime.strptime(
-                #         f"{hour}:{minute}:{00}", 
-                #         "%H:%M:%S"
-                #     ).replace(year=now.year, month=now.month, day=now.day)
-                #     time_diff = abs((now - scheduled_datetime).total_seconds())
-                #     if time_diff <= self.schedule_seconds:
-                #         return True, WakeWorkType.SCHEDULE
-                    
                 current_time = time.time() # timestamp
                 if current_time - last_button_check_time >= button_check_interval:
                     res = self.check_buttons()

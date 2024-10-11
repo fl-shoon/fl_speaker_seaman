@@ -2,10 +2,10 @@ import requests
 from etc.define import *
 
 class PutData:
-    def __init__(self, id, url):
+    def __init__(self):
         self.token = None
-        self.speaker_id = id 
-        self.server_url = url
+        self.speaker_id = SPEAKER_ID 
+        self.server_url = SERVER_URL
         self.sensor_data_schema = {
             'temperatureSensor': str,
             'irSensor': bool,
