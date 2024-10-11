@@ -34,6 +34,7 @@ class VoiceAssistant:
         self.volume = 0.5
         self.auth_token = None
         self.schedule = {}
+        self.server_retry_interval = 60
         self.schedule_update_interval = 3 * 60 # run schedule every 3 minutes
         self.last_sensor_data = None
         self.initialize(self.args.aiclient)
@@ -71,13 +72,34 @@ class VoiceAssistant:
             self.cleanup()
             raise
 
+    def connect_to_server(self):
+        while not self.auth_token and not exit_event.is_set():
+            try:
+                self.auth_token = self.http_get.fetch_auth_token()
+                if self.auth_token:
+                    logger.info("Successfully connected to server")
+                    self.get_schedule()
+                    return
+            except Exception as e:
+                logger.error(f"Failed to connect to server: {e}")
+            
+            logger.info(f"Retrying server connection in {self.server_retry_interval} seconds...")
+            time.sleep(self.server_retry_interval)
+            
     def get_schedule(self):
-        if self.auth_token:
+        if not self.auth_token:
+            logger.error("No authentication token available. Cannot fetch schedule.")
+            return
+        
+        try:
             new_schedule = self.http_get.fetch_schedule()
             if new_schedule != self.schedule:
                 self.schedule = new_schedule
                 self.set_next_schedule_check()
             logger.info("Schedule updated")
+        except Exception as e:
+            logger.error(f"Failed to fetch schedule: {e}")
+            self.connect_to_server()
     
     def set_next_schedule_check(self):
         if not self.schedule:
@@ -111,11 +133,21 @@ class VoiceAssistant:
             self.set_next_schedule_check()
 
     def update_sensor_data(self):
+        if not self.auth_token:
+            logger.error("No authentication token available. Cannot update sensor data.")
+            return
+        
         current_data = self.get_current_sensor_data()
         if self.should_update_sensor_data(current_data):
-            if self.auth_token:
-                self.http_put.update_sensor_data(self.auth_token, current_data)
-            self.last_sensor_data = current_data
+            try:
+                success = self.http_put.update_sensor_data(self.auth_token, current_data)
+                if success:
+                    self.last_sensor_data = current_data
+                else:
+                    logger.error("Failed to update sensor data")
+            except Exception as e:
+                logger.error(f"Error updating sensor data: {e}")
+                self.connect_to_server()
 
     def should_update_sensor_data(self, current_data):
         if not self.last_sensor_data:

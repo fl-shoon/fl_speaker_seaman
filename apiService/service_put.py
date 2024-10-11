@@ -24,12 +24,22 @@ class PutData:
 
     def update_sensor_data(self, token, data):
         invalid_fields = self.validate_data_types(data)
-        if invalid_fields: return 
-        headers = {"Authorization": token, "uid": self.speaker_id, "Content-Type": "application/json"}
-        response = requests.put(f"{self.server_url}/update_sensor_data", headers=headers, json=data)
-        if response.status_code == 200:
-            response_json = response.json()
-            success = response_json['success']
-            logger.info(f"Success : {success} : Updated sensor data successfully: {response.text}")
-        else:
-            logger.error(f"Failed to update sensor data: {response.text}")
+
+        if invalid_fields:
+            logger.error(f"Invalid data fields: {', '.join(invalid_fields)}")
+            return False
+        
+        try: 
+            headers = {"Authorization": token, "uid": self.speaker_id, "Content-Type": "application/json"}
+            response = requests.put(f"{self.server_url}/update_sensor_data", headers=headers, json=data)
+            if response.status_code == 200:
+                response_json = response.json()
+                success = response_json['success']
+                logger.info(f"Success : {success} : Updated sensor data successfully: {response.text}")
+                return True
+            else:
+                logger.error(f"Failed to update sensor data: {response.text}")
+                return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to connect to server while updating sensor data: {e}")
+            return False
