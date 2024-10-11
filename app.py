@@ -76,12 +76,12 @@ class VoiceAssistant:
             logger.error("No authentication token available. Cannot fetch schedule.")
             logger.info("reconnecting...")
             try:
-                self.auth_token = self.http_get.fetch_auth_token()
-                if self.auth_token or os.environ["AUTH_TOKEN"]:
-                    self.auth_token = os.environ["AUTH_TOKEN"]
+                self.http_get.fetch_auth_token()
+                self.auth_token = self.http_get.token
+                if self.auth_token:
                     logger.info("Successfully connected to server")
             except Exception as e:
-                logger.error(f"Failed to connect to server: {e}")
+                logger.error(f"Failed to connect to server to retrieve schedule: {e}")
                 return
         
         try:
@@ -129,12 +129,12 @@ class VoiceAssistant:
             logger.error("No authentication token available. Cannot update sensor data.")
             logger.info("reconnecting...")
             try:
-                self.auth_token = self.http_get.fetch_auth_token()
-                if self.auth_token or os.environ["AUTH_TOKEN"]:
-                    self.auth_token = os.environ["AUTH_TOKEN"]
+                self.http_get.fetch_auth_token()
+                self.auth_token = self.http_get.token
+                if self.auth_token:
                     logger.info("Successfully connected to server")
             except Exception as e:
-                logger.error(f"Failed to connect to server: {e}")
+                logger.error(f"Failed to connect to server to retrieve sensor data: {e}")
                 return
         
         current_data = self.get_current_sensor_data()
