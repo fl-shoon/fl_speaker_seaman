@@ -34,7 +34,6 @@ class VoiceAssistant:
         self.volume = 0.5
         self.auth_token = None
         self.schedule = {}
-        self.server_retry_interval = 60
         self.schedule_update_interval = 3 * 60 # run schedule every 3 minutes
         self.last_sensor_data = None
         self.initialize(self.args.aiclient)
@@ -72,24 +71,17 @@ class VoiceAssistant:
             self.cleanup()
             raise
 
-    def connect_to_server(self):
-        while not self.auth_token and not exit_event.is_set():
+    def get_schedule(self):
+        if not self.auth_token:
+            logger.error("No authentication token available. Cannot fetch schedule.")
+            logger.info("reconnecting...")
             try:
                 self.auth_token = self.http_get.fetch_auth_token()
                 if self.auth_token:
                     logger.info("Successfully connected to server")
-                    self.get_schedule()
-                    return
             except Exception as e:
                 logger.error(f"Failed to connect to server: {e}")
-            
-            logger.info(f"Retrying server connection in {self.server_retry_interval} seconds...")
-            time.sleep(self.server_retry_interval)
-            
-    def get_schedule(self):
-        if not self.auth_token:
-            logger.error("No authentication token available. Cannot fetch schedule.")
-            return
+                return
         
         try:
             new_schedule = self.http_get.fetch_schedule()
@@ -99,7 +91,6 @@ class VoiceAssistant:
             logger.info("Schedule updated")
         except Exception as e:
             logger.error(f"Failed to fetch schedule: {e}")
-            self.connect_to_server()
     
     def set_next_schedule_check(self):
         if not self.schedule:
@@ -135,7 +126,14 @@ class VoiceAssistant:
     def update_sensor_data(self):
         if not self.auth_token:
             logger.error("No authentication token available. Cannot update sensor data.")
-            return
+            logger.info("reconnecting...")
+            try:
+                self.auth_token = self.http_get.fetch_auth_token()
+                if self.auth_token:
+                    logger.info("Successfully connected to server")
+            except Exception as e:
+                logger.error(f"Failed to connect to server: {e}")
+                return
         
         current_data = self.get_current_sensor_data()
         if self.should_update_sensor_data(current_data):
@@ -147,7 +145,6 @@ class VoiceAssistant:
                     logger.error("Failed to update sensor data")
             except Exception as e:
                 logger.error(f"Error updating sensor data: {e}")
-                self.connect_to_server()
 
     def should_update_sensor_data(self, current_data):
         if not self.last_sensor_data:
