@@ -74,8 +74,8 @@ class VoiceAssistant:
             self.cleanup()
             raise
 
-    def get_schedule(self):
-        if self.auth_token: self.schedule = self.http_get.fetch_schedule()
+    # def get_schedule(self):
+    #     if self.auth_token: self.schedule = self.http_get.fetch_schedule()
 
     def update_sensor_data(self):
         current_data = self.get_current_sensor_data()

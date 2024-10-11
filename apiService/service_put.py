@@ -30,6 +30,6 @@ class PutData:
         if response.status_code == 200:
             response_json = response.json()
             success = response_json['success']
-            logger.error(f"Success : {success} : Updated sensor data successfully: {response.text}")
+            logger.info(f"Success : {success} : Updated sensor data successfully: {response.text}")
         else:
             logger.error(f"Failed to update sensor data: {response.text}")
