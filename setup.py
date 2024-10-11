@@ -61,7 +61,7 @@ class RaspberryPiSetup:
             "pyserial",
             "pygame",
             "pvrecorder",
-            "openai",
+            "requests",
             "PyAudio",
             "scipy",
             "Pillow",
