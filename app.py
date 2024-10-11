@@ -77,7 +77,8 @@ class VoiceAssistant:
             logger.info("reconnecting...")
             try:
                 self.auth_token = self.http_get.fetch_auth_token()
-                if self.auth_token:
+                if self.auth_token or os.environ["AUTH_TOKEN"]:
+                    self.auth_token = os.environ["AUTH_TOKEN"]
                     logger.info("Successfully connected to server")
             except Exception as e:
                 logger.error(f"Failed to connect to server: {e}")
@@ -129,7 +130,8 @@ class VoiceAssistant:
             logger.info("reconnecting...")
             try:
                 self.auth_token = self.http_get.fetch_auth_token()
-                if self.auth_token:
+                if self.auth_token or os.environ["AUTH_TOKEN"]:
+                    self.auth_token = os.environ["AUTH_TOKEN"]
                     logger.info("Successfully connected to server")
             except Exception as e:
                 logger.error(f"Failed to connect to server: {e}")
@@ -268,7 +270,7 @@ class VoiceAssistant:
             logger.error(f"Error in wake word detection: {e}")
         finally:
             self.recorder.stop()
-        return False
+        return False, None
 
     async def process_conversation(self):
         conversation_active = True
@@ -426,11 +428,18 @@ async def main():
         assistant.audioPlayer.play_trigger_with_logo(TriggerAudio, SeamanLogo)
 
         while not exit_event.is_set():
-            res, trigger_type = assistant.listen_for_wake_word()
-            if res and trigger_type == WakeWorkType.TRIGGER:
-                await assistant.process_conversation()
-            if res and trigger_type == WakeWorkType.SCHEDULE:
-                await assistant.scheduled_conversation()
+            try:
+                res, trigger_type = assistant.listen_for_wake_word()
+                if res:
+                    if trigger_type == WakeWorkType.TRIGGER:
+                        await assistant.process_conversation()
+                    if trigger_type == WakeWorkType.SCHEDULE:
+                        await assistant.scheduled_conversation()
+                else:
+                    await asyncio.sleep(0.1)
+            except Exception as e:
+                logger.error(f"Error in main loop: {e}")
+                await asyncio.sleep(1)
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Shutting down...")

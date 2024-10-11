@@ -1,5 +1,7 @@
-import requests
 from etc.define import logger, SPEAKER_ID, SERVER_URL
+
+import requests
+import subprocess
 
 class GetData:
     def __init__(self):
@@ -14,6 +16,7 @@ class GetData:
             response = requests.post(f"{self.server_url}/fetch_auth_token", headers=headers)
             if response.status_code == 200:
                 self.token = response.json()['token']
+                subprocess.run(f"export AUTH_TOKEN='{self.token}'", check=True, shell=True, capture_output=True, text=True)
                 logger.info(f"Authentication token has been fetched: {self.token}")
             else:
                 logger.error(f"Failed to get token: {response.text}")
