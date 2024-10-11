@@ -19,7 +19,7 @@ class GetData:
             else:
                 logger.error(f"Failed to get token: {response.text}")
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to connect to server: {e}")
+            logger.error(f"Failed to connect to server while fetching auth token: {e}")
             self.token = None
 
     def fetch_schedule(self):

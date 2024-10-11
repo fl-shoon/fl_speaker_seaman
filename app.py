@@ -81,7 +81,7 @@ class VoiceAssistant:
                 if self.auth_token:
                     logger.info("Successfully connected to server")
             except Exception as e:
-                logger.error(f"Failed to connect to server to retrieve schedule: {e}")
+                logger.error(f"Failed fetching schedule: {e}")
                 return
         
         try:
@@ -134,7 +134,7 @@ class VoiceAssistant:
                 if self.auth_token:
                     logger.info("Successfully connected to server")
             except Exception as e:
-                logger.error(f"Failed to connect to server to retrieve sensor data: {e}")
+                logger.error(f"Failed during sensor data update: {e}")
                 return
         
         current_data = self.get_current_sensor_data()
