@@ -241,7 +241,8 @@ class VoiceAssistant:
 
                 audio_frame = self.recorder.read()
                 # audio_data = np.array(audio_frame, dtype=np.int16)
-                calibration_frames.append(audio_frame)
+                audio_frame_bytes = np.array(audio_frame, dtype=np.int16).tobytes()
+                calibration_frames.append(audio_frame_bytes)
 
                 # self.update_calibration(audio_data)
                 # frames_since_last_calibration += 1
