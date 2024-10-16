@@ -1,44 +1,80 @@
 import cv2
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 import time
 
-def test_camera_headless():
-    # Open the first camera device (usually the Pi camera)
-    cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        print("Error: Could not open camera.")
-        return
-    
-    print("Camera opened successfully. Starting to capture frames...")
-    
-    try:
-        start_time = time.time()
-        frame_count = 0
-        
-        while time.time() - start_time < 10:  # Run for 10 seconds
-            # Capture frame-by-frame
-            ret, frame = cap.read()
-            
-            if not ret:
-                print("Error: Can't receive frame. Exiting ...")
-                break
-            
-            frame_count += 1
-            
-            # Optional: You could save a frame here if you want to verify image capture
-            # cv2.imwrite(f'frame_{frame_count}.jpg', frame)
-            
-            # Print dimensions of the frame
-            height, width, channels = frame.shape
-            print(f"Captured frame {frame_count}: {width}x{height} ({channels} channels)")
-            
-            # Optional: add a small delay to reduce CPU usage
-            time.sleep(0.1)
-    
-    finally:
-        # When everything done, release the capture
-        cap.release()
-        print(f"Camera test completed. Captured {frame_count} frames in 10 seconds.")
+class CameraStream:
+    def __init__(self):
+        self.camera = cv2.VideoCapture(0)
+        self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.frame = None
+        self.thread = threading.Thread(target=self._capture_loop)
+        self.thread.daemon = True
+        self.thread.start()
 
-if __name__ == "__main__":
-    test_camera_headless()
+    def _capture_loop(self):
+        while True:
+            ret, self.frame = self.camera.read()
+            if not ret:
+                break
+            time.sleep(0.01)
+
+    def get_frame(self):
+        return self.frame
+
+class StreamingHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            self.wfile.write(b'''
+                <html>
+                <head>
+                    <title>Raspberry Pi Camera Stream</title>
+                </head>
+                <body>
+                    <h1>Raspberry Pi Camera Stream</h1>
+                    <img src="/stream" width="640" height="480" />
+                </body>
+                </html>
+            ''')
+        elif self.path == '/stream':
+            self.send_response(200)
+            self.send_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
+            self.end_headers()
+            try:
+                while True:
+                    frame = camera_stream.get_frame()
+                    if frame is not None:
+                        _, jpeg = cv2.imencode('.jpg', frame)
+                        self.wfile.write(b'--frame\r\n')
+                        self.send_header('Content-type', 'image/jpeg')
+                        self.send_header('Content-length', len(jpeg))
+                        self.end_headers()
+                        self.wfile.write(jpeg.tobytes())
+                        self.wfile.write(b'\r\n')
+                    else:
+                        time.sleep(0.1)
+            except Exception as e:
+                print(f"Removed streaming client: {str(e)}")
+        else:
+            self.send_error(404)
+            self.end_headers()
+
+class StreamingServer(ThreadingMixIn, HTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+camera_stream = CameraStream()
+
+def run_server():
+    address = ('', 8000)
+    server = StreamingServer(address, StreamingHandler)
+    print(f'Starting server on port 8000')
+    server.serve_forever()
+
+if __name__ == '__main__':
+    run_server()
