@@ -28,20 +28,11 @@ class InteractiveRecorder:
     def __init__(self):
         self.stream = None
         self.beep_file = self.generate_beep_file()
-        # How long each chunk should be in time
         self.CHUNK_DURATION_MS = 30 
-        # Pieces of sound data to be collected in one chunk
         self.CHUNK_SIZE = int(RATE * self.CHUNK_DURATION_MS / 1000)
-        # Number of chunks to be processed in one second
         self.CHUNKS_PER_SECOND = 1000 // self.CHUNK_DURATION_MS
-
-        self.audio_buffer = deque(maxlen=50) 
-        # The loudness level above that is considered to be speech 
         self.energy_threshold = None
-        # How long each chunk should be in time
         self.silence_energy = None
-        # How loud it typically is when someone is speaking
-        self.speech_energy = None
 
         with suppress_stdout_stderr():
             self.p = pyaudio.PyAudio()
@@ -72,26 +63,42 @@ class InteractiveRecorder:
         y = lfilter(b, a, data)
         return y
 
-    def calibrate_energy_threshold(self, duration=2):
-        self.start_stream()
+    def calibrate_energy_threshold(self, audio_frames):
         energy_levels = []
-        for _ in range(duration * self.CHUNKS_PER_SECOND):
-            data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
-            audio_chunk = np.frombuffer(data, dtype=np.int16)
+        for frame in audio_frames:
+            audio_chunk = np.frombuffer(frame, dtype=np.int16)
             filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
             energy = np.sum(filtered_audio**2) / len(filtered_audio)
             energy_levels.append(energy)
         
         self.silence_energy = np.mean(energy_levels)
-        # if the recording has ended before speech, use larger value than 3
         self.energy_threshold = self.silence_energy * 3 
-        # logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
-        self.stop_stream()
+    
+    def is_speech(self, audio_frame):
+        if self.energy_threshold is None:
+            return False
+        audio_chunk = np.frombuffer(audio_frame, dtype=np.int16)
+        filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
+        energy = np.sum(filtered_audio**2) / len(filtered_audio)
+        return energy > self.energy_threshold
+
+    # def calibrate_energy_threshold(self, duration=2):
+    #     self.start_stream()
+    #     energy_levels = []
+    #     for _ in range(duration * self.CHUNKS_PER_SECOND):
+    #         data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
+    #         audio_chunk = np.frombuffer(data, dtype=np.int16)
+    #         filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
+    #         energy = np.sum(filtered_audio**2) / len(filtered_audio)
+    #         energy_levels.append(energy)
+        
+    #     self.silence_energy = np.mean(energy_levels)
+    #     # if the recording has ended before speech, use larger value than 3
+    #     self.energy_threshold = self.silence_energy * 3 
+    #     # logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
+    #     self.stop_stream()
 
     def record_question(self, silence_duration, max_duration, audio_player):
-        if self.energy_threshold is None:
-            return None
-
         self.start_stream()
         logging.info("Listening... Speak your question.")
 
@@ -107,18 +114,7 @@ class InteractiveRecorder:
             frames.append(data)
             total_chunks += 1
 
-            audio_chunk = np.frombuffer(data, dtype=np.int16)
-            filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
-            energy = np.sum(filtered_audio**2) / len(filtered_audio)
-
-            self.audio_buffer.append(energy)
-            average_energy = np.mean(self.audio_buffer)
-
-            is_speech = energy > self.energy_threshold
-
-            # logging.debug(f"Chunk {total_chunks}: Energy: {energy:.2f}, Average energy: {average_energy:.2f}, Threshold: {self.energy_threshold:.2f}, Is speech: {is_speech}, Silent chunks: {silent_chunks}")
-
-            if is_speech:
+            if self.is_speech(data):
                 if not is_speaking:
                     logging.info("Speech detected. Recording...")
                     is_speaking = True

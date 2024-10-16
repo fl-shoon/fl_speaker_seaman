@@ -220,11 +220,13 @@ class VoiceAssistant:
         
     def listen_for_wake_word(self):
         self.recorder.start()
-        self.calibration_buffer.clear()
-        self.energy_levels.clear()
-        calibration_interval = 50  # 50 -> frames
+        calibration_frames = []
+        # self.calibration_buffer.clear()
+        # self.energy_levels.clear()
+        calibration_interval = 5
         frames_since_last_calibration = 0
         last_button_check_time = time.time()
+        last_calibration_time = time.time()
         button_check_interval = 1.5 # 1 -> check buttons every 1 seconds
         detections = -1
 
@@ -238,14 +240,22 @@ class VoiceAssistant:
                     return True, WakeWorkType.SCHEDULE
 
                 audio_frame = self.recorder.read()
-                audio_data = np.array(audio_frame, dtype=np.int16)
+                # audio_data = np.array(audio_frame, dtype=np.int16)
+                calibration_frames.append(audio_frame)
 
-                self.update_calibration(audio_data)
-                frames_since_last_calibration += 1
+                # self.update_calibration(audio_data)
+                # frames_since_last_calibration += 1
 
-                if frames_since_last_calibration >= calibration_interval:
-                    self.perform_calibration()
-                    frames_since_last_calibration = 0
+                # if frames_since_last_calibration >= calibration_interval:
+                #     self.perform_calibration()
+                #     frames_since_last_calibration = 0
+
+                current_time = time.time() # timestamp
+
+                if current_time - last_calibration_time >= calibration_interval:
+                    self.interactive_recorder.calibrate_energy_threshold(calibration_frames)
+                    calibration_frames = []
+                    last_calibration_time = current_time
 
                 detections = self.porcupine.process(audio_frame)
                 wake_word_triggered = detections >= 0
@@ -255,7 +265,6 @@ class VoiceAssistant:
                     self.audioPlayer.play_audio(ResponseAudio)
                     return True, WakeWorkType.TRIGGER
                 
-                current_time = time.time() # timestamp
                 if current_time - last_button_check_time >= button_check_interval:
                     res = self.check_buttons()
                     
