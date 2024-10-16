@@ -2,7 +2,6 @@ from apiService.service_get import GetData
 from apiService.service_put import PutData
 from audio.player import AudioPlayer
 from audio.recorder import InteractiveRecorder
-from collections import deque
 from display.display import DisplayModule
 from display.setting import SettingMenu
 from etc.define import *
@@ -43,8 +42,6 @@ class VoiceAssistant:
             self.http_get = GetData()
             self.http_put = PutData()
             self.interactive_recorder = InteractiveRecorder()
-            self.calibration_buffer = deque(maxlen=100)  
-            self.energy_levels = deque(maxlen=100)
             self.serial_module = SerialModule(BautRate)
             self.display = DisplayModule(self.serial_module)
             self.audioPlayer = AudioPlayer(self.display)
@@ -221,10 +218,7 @@ class VoiceAssistant:
     def listen_for_wake_word(self):
         self.recorder.start()
         calibration_frames = []
-        # self.calibration_buffer.clear()
-        # self.energy_levels.clear()
         calibration_interval = 5
-        frames_since_last_calibration = 0
         last_button_check_time = time.time()
         last_calibration_time = time.time()
         button_check_interval = 1.5 # 1 -> check buttons every 1 seconds
@@ -240,16 +234,8 @@ class VoiceAssistant:
                     return True, WakeWorkType.SCHEDULE
 
                 audio_frame = self.recorder.read()
-                # audio_data = np.array(audio_frame, dtype=np.int16)
                 audio_frame_bytes = np.array(audio_frame, dtype=np.int16).tobytes()
                 calibration_frames.append(audio_frame_bytes)
-
-                # self.update_calibration(audio_data)
-                # frames_since_last_calibration += 1
-
-                # if frames_since_last_calibration >= calibration_interval:
-                #     self.perform_calibration()
-                #     frames_since_last_calibration = 0
 
                 current_time = time.time() # timestamp
 
@@ -370,20 +356,6 @@ class VoiceAssistant:
                 conversation_active = False
 
         self.display.fade_in_logo(SeamanLogo)
-
-    def update_calibration(self, audio_data):
-        chunk = audio_data[:self.interactive_recorder.CHUNK_SIZE]
-        filtered_audio = self.interactive_recorder.butter_lowpass_filter(chunk, cutoff=1000, fs=RATE)
-        energy = np.sum(filtered_audio**2) / len(filtered_audio)
-        self.energy_levels.append(energy)
-
-    def perform_calibration(self):
-        if len(self.energy_levels) > 0:
-            self.interactive_recorder.silence_energy = np.mean(self.energy_levels)
-            self.interactive_recorder.energy_threshold = self.interactive_recorder.silence_energy * 3
-            # logger.info(f"Calibration updated. Silence energy: {self.interactive_recorder.silence_energy}, Threshold: {self.interactive_recorder.energy_threshold}")
-        else:
-            logger.warning("No energy data available for calibration")
 
     def serial_port_check(self):
         if not self.serial_module.isPortOpen:

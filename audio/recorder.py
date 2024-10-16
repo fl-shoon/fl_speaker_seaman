@@ -83,22 +83,6 @@ class InteractiveRecorder:
         energy = np.sum(filtered_audio**2) / len(filtered_audio)
         return energy > self.energy_threshold
 
-    # def calibrate_energy_threshold(self, duration=2):
-    #     self.start_stream()
-    #     energy_levels = []
-    #     for _ in range(duration * self.CHUNKS_PER_SECOND):
-    #         data = self.stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
-    #         audio_chunk = np.frombuffer(data, dtype=np.int16)
-    #         filtered_audio = self.butter_lowpass_filter(audio_chunk, cutoff=1000, fs=RATE)
-    #         energy = np.sum(filtered_audio**2) / len(filtered_audio)
-    #         energy_levels.append(energy)
-        
-    #     self.silence_energy = np.mean(energy_levels)
-    #     # if the recording has ended before speech, use larger value than 3
-    #     self.energy_threshold = self.silence_energy * 3 
-    #     # logger.info(f"Calibration complete. Silence energy: {self.silence_energy}, Threshold: {self.energy_threshold}")
-    #     self.stop_stream()
-
     def record_question(self, silence_duration, max_duration, audio_player):
         self.start_stream()
         logging.info("Listening... Speak your question.")
