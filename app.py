@@ -238,7 +238,6 @@ class VoiceAssistant:
                     return True, WakeWorkType.SCHEDULE
 
                 audio_frame = self.interactive_recorder.stream.read(self.interactive_recorder.CHUNK_SIZE, exception_on_overflow=False)
-                audio_frames.append(audio_frame)
                 # audio_frame = self.recorder.read()
                 audio_frame_bytes = np.array(audio_frame, dtype=np.int16).tobytes()
                 audio_bytes.append(audio_frame_bytes)
@@ -247,12 +246,12 @@ class VoiceAssistant:
 
                 if current_time - last_calibration_time >= calibration_interval:
                     self.interactive_recorder.calibrate_energy_threshold(audio_bytes)
-                    self.interactive_recorder.save_audio(audio_frames, TEMP_AUDIO_FILE)
+                    self.interactive_recorder.save_audio(audio_bytes, TEMP_AUDIO_FILE)
                     stt_text = self.ai_client.speech_to_text(TEMP_AUDIO_FILE)
 
                     await asyncio.sleep(0.1)
 
-                    audio_frames = []
+                    # audio_frames = []
                     audio_bytes = []
                     last_calibration_time = current_time
 
