@@ -51,7 +51,7 @@ class InteractiveRecorder:
             self.stream.close()
             self.stream = None
 
-    def save_audio(frames, filename):
+    def save_audio(self, frames, filename):
         wf = wave.open(filename, 'wb')
         wf.setnchannels(CHANNELS)
         wf.setsampwidth(pyaudio.PyAudio().get_sample_size(pyaudio.paInt16))
