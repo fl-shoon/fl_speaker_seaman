@@ -35,7 +35,7 @@ class VoiceAssistant:
         self.schedule = {}
         self.schedule_update_interval = 3 * 60 # run schedule every 3 minutes
         self.last_sensor_data = None
-        self.wake_word = "サトル"
+        self.wake_word = "さとるさん"
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
