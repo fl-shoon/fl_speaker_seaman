@@ -253,6 +253,7 @@ class VoiceAssistant:
                     await asyncio.sleep(0.1)
 
                     audio_frames = []
+                    audio_bytes = []
                     last_calibration_time = current_time
 
                 # detections = self.porcupine.process(audio_frame)
