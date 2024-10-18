@@ -118,7 +118,7 @@ class OpenAIClient:
             # async for transcript_chunk in self.speech_to_text(input_audio_file):
             #     response_text += transcript_chunk
 
-            response_text = self.speech_to_text(input_audio_file)
+            response_text = await self.speech_to_text(input_audio_file)
             logger.info(f"Result from stt: {response_text}")
 
             # Generate response (Chat)
