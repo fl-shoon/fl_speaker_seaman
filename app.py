@@ -217,10 +217,9 @@ class VoiceAssistant:
             return None
         
     async def listen_for_wake_word(self):
-        self.recorder.start()
+        # self.recorder.start()
         audio_frames = []
-        audio_bytes = []
-        stt_text = ""
+        # stt_text = ""
         calibration_interval = 5
         last_button_check_time = time.time()
         last_calibration_time = time.time()
@@ -237,27 +236,26 @@ class VoiceAssistant:
                 if self.scheduled_conversation_flag:
                     return True, WakeWorkType.SCHEDULE
 
-                audio_frame = self.interactive_recorder.stream.read(self.interactive_recorder.CHUNK_SIZE, exception_on_overflow=False)
-                # audio_frame = self.recorder.read()
+                # audio_frame = self.interactive_recorder.stream.read(self.interactive_recorder.CHUNK_SIZE, exception_on_overflow=False)
+                audio_frame = self.recorder.read()
                 audio_frame_bytes = np.array(audio_frame, dtype=np.int16).tobytes()
-                audio_bytes.append(audio_frame_bytes)
+                audio_frames.append(audio_frame_bytes)
 
                 current_time = time.time() # timestamp
 
                 if current_time - last_calibration_time >= calibration_interval:
-                    self.interactive_recorder.calibrate_energy_threshold(audio_bytes)
-                    self.interactive_recorder.save_audio(audio_bytes, TEMP_AUDIO_FILE)
-                    stt_text = self.ai_client.speech_to_text(TEMP_AUDIO_FILE)
+                    self.interactive_recorder.calibrate_energy_threshold(audio_frames)
+                    # self.interactive_recorder.save_audio(audio_frames, TEMP_AUDIO_FILE)
+                    # stt_text = self.ai_client.speech_to_text(TEMP_AUDIO_FILE)
 
-                    await asyncio.sleep(0.1)
+                    # await asyncio.sleep(0.1)
 
-                    # audio_frames = []
-                    audio_bytes = []
+                    audio_frames = []
                     last_calibration_time = current_time
 
-                # detections = self.porcupine.process(audio_frame)
-                # wake_word_triggered = detections >= 0
-                wake_word_triggered = self.wake_word.lower() in stt_text.lower()
+                detections = self.porcupine.process(audio_frame)
+                wake_word_triggered = detections >= 0
+                # wake_word_triggered = self.wake_word.lower() in stt_text.lower()
                 
                 if wake_word_triggered:
                     logger.info("Wake word detected")
@@ -277,8 +275,8 @@ class VoiceAssistant:
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
         finally:
-            # self.recorder.stop()
-            self.interactive_recorder.stop_stream()
+            self.recorder.stop()
+            # self.interactive_recorder.stop_stream()
         return False, None
 
     async def process_conversation(self):
