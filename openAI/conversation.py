@@ -85,7 +85,6 @@ class OpenAIClient:
         if len(self.conversation_history) > 11:
             self.conversation_history = self.conversation_history[:1] + self.conversation_history[-10:]
 
-    # async def speech_to_text(self, audio_file_path: str) -> AsyncGenerator[str, None]:
     async def speech_to_text(self, audio_file_path: str) -> str:
         with open(audio_file_path, "rb") as audio_file:
             files = {"file": ("audio.wav", audio_file)}
@@ -94,7 +93,6 @@ class OpenAIClient:
             
             async for chunk in self.service_openAI("audio/transcriptions", payload, files):
                 transcript_chunk = chunk.decode('utf-8')
-                # yield transcript_chunk
                 response_text += transcript_chunk
 
             return response_text
@@ -114,10 +112,6 @@ class OpenAIClient:
             output_audio_file = f"{base}_response{ext}"
 
             # Transcribe audio (STT)
-            # response_text = ""
-            # async for transcript_chunk in self.speech_to_text(input_audio_file):
-            #     response_text += transcript_chunk
-
             response_text = await self.speech_to_text(input_audio_file)
             logger.info(f"Result from stt: {response_text}")
 

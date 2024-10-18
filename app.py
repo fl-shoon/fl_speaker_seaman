@@ -18,7 +18,7 @@ import numpy as np
 import schedule
 import signal
 import time
-import wave
+# import wave
 
 exit_event = Event()
 
@@ -35,6 +35,7 @@ class VoiceAssistant:
         self.schedule = {}
         self.schedule_update_interval = 3 * 60 # run schedule every 3 minutes
         self.last_sensor_data = None
+        self.wake_word = "サトル"
         self.initialize(self.args.aiclient)
 
     def initialize(self, aiclient):
@@ -215,9 +216,10 @@ class VoiceAssistant:
             logger.error(f"Error in check_buttons: {e}")
             return None
         
-    def listen_for_wake_word(self):
+    async def listen_for_wake_word(self):
         self.recorder.start()
-        calibration_frames = []
+        audio_frames = []
+        stt_text = ""
         calibration_interval = 5
         last_button_check_time = time.time()
         last_calibration_time = time.time()
@@ -233,19 +235,26 @@ class VoiceAssistant:
                 if self.scheduled_conversation_flag:
                     return True, WakeWorkType.SCHEDULE
 
-                audio_frame = self.recorder.read()
+                audio_frame = self.interactive_recorder.start_stream()
+                # audio_frame = self.recorder.read()
                 audio_frame_bytes = np.array(audio_frame, dtype=np.int16).tobytes()
-                calibration_frames.append(audio_frame_bytes)
+                audio_frames.append(audio_frame_bytes)
 
                 current_time = time.time() # timestamp
 
                 if current_time - last_calibration_time >= calibration_interval:
-                    self.interactive_recorder.calibrate_energy_threshold(calibration_frames)
-                    calibration_frames = []
+                    self.interactive_recorder.calibrate_energy_threshold(audio_frames)
+                    self.interactive_recorder.save_audio(audio_frames, TEMP_AUDIO_FILE)
+                    stt_text = self.ai_client.speech_to_text(TEMP_AUDIO_FILE)
+
+                    await asyncio.sleep(0.1)
+
+                    audio_frames = []
                     last_calibration_time = current_time
 
-                detections = self.porcupine.process(audio_frame)
-                wake_word_triggered = detections >= 0
+                # detections = self.porcupine.process(audio_frame)
+                # wake_word_triggered = detections >= 0
+                wake_word_triggered = self.wake_word.lower() in stt_text.lower()
                 
                 if wake_word_triggered:
                     logger.info("Wake word detected")
@@ -265,7 +274,8 @@ class VoiceAssistant:
         except Exception as e:
             logger.error(f"Error in wake word detection: {e}")
         finally:
-            self.recorder.stop()
+            # self.recorder.stop()
+            self.interactive_recorder.stop_stream()
         return False, None
 
     async def process_conversation(self):
@@ -278,9 +288,9 @@ class VoiceAssistant:
                 break
 
             self.display.start_listening_display(SatoruHappy)
-            audio_data = self.interactive_recorder.record_question(silence_duration=2, max_duration=30, audio_player=self.audioPlayer)
+            frames = self.interactive_recorder.record_question(silence_duration=2, max_duration=30, audio_player=self.audioPlayer)
 
-            if not audio_data:
+            if not frames:
                 silence_count += 1
                 if silence_count >= max_silence:
                     logger.info("Maximum silence reached. Ending conversation.")
@@ -290,11 +300,12 @@ class VoiceAssistant:
                 silence_count = 0
 
             input_audio_file = AIOutputAudio
-            with wave.open(input_audio_file, 'wb') as wf:
-                wf.setnchannels(CHANNELS)
-                wf.setsampwidth(2)
-                wf.setframerate(RATE)
-                wf.writeframes(audio_data)
+            self.interactive_recorder.save_audio(frames, input_audio_file)
+            # with wave.open(input_audio_file, 'wb') as wf:
+            #     wf.setnchannels(CHANNELS)
+            #     wf.setsampwidth(2)
+            #     wf.setframerate(RATE)
+            #     wf.writeframes(frames)
 
             self.display.stop_listening_display()
 
@@ -322,9 +333,9 @@ class VoiceAssistant:
 
             if input_audio_file:
                 self.display.start_listening_display(SatoruHappy)
-                audio_data = self.interactive_recorder.record_question(silence_duration=2, max_duration=30, audio_player=self.audioPlayer)
+                frames = self.interactive_recorder.record_question(silence_duration=2, max_duration=30, audio_player=self.audioPlayer)
 
-                if not audio_data:
+                if not frames:
                     silence_count += 1
                     if silence_count >= max_silence:
                         logger.info("Maximum silence reached. Ending conversation.")
@@ -333,11 +344,12 @@ class VoiceAssistant:
                 else:
                     silence_count = 0
 
-                with wave.open(input_audio_file, 'wb') as wf:
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(2)
-                    wf.setframerate(RATE)
-                    wf.writeframes(audio_data)
+                self.interactive_recorder.save_audio(frames, input_audio_file)
+                # with wave.open(input_audio_file, 'wb') as wf:
+                #     wf.setnchannels(CHANNELS)
+                #     wf.setsampwidth(2)
+                #     wf.setframerate(RATE)
+                #     wf.writeframes(frames)
 
                 self.display.stop_listening_display()
 
@@ -411,7 +423,7 @@ async def main():
 
         while not exit_event.is_set():
             try:
-                res, trigger_type = assistant.listen_for_wake_word()
+                res, trigger_type = await assistant.listen_for_wake_word()
                 if res:
                     if trigger_type == WakeWorkType.TRIGGER:
                         await assistant.process_conversation()
