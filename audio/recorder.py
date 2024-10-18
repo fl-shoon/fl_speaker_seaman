@@ -54,9 +54,9 @@ class InteractiveRecorder:
     def save_audio(self, frames, filename):
         wf = wave.open(filename, 'wb')
         wf.setnchannels(CHANNELS)
-        wf.setsampwidth(pyaudio.PyAudio().get_sample_size(pyaudio.paInt16))
+        wf.setsampwidth(2)
         wf.setframerate(RATE)
-        wf.writeframes(b''.join(frames))
+        wf.writeframes(frames)
         wf.close()
 
     def butter_lowpass(self, cutoff, fs, order=5):
