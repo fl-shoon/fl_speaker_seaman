@@ -219,6 +219,7 @@ class VoiceAssistant:
     async def listen_for_wake_word(self):
         self.recorder.start()
         audio_frames = []
+        audio_bytes = []
         stt_text = ""
         calibration_interval = 5
         last_button_check_time = time.time()
@@ -236,14 +237,15 @@ class VoiceAssistant:
                     return True, WakeWorkType.SCHEDULE
 
                 audio_frame = self.interactive_recorder.start_stream()
+                audio_frames.append(audio_frame)
                 # audio_frame = self.recorder.read()
                 audio_frame_bytes = np.array(audio_frame, dtype=np.int16).tobytes()
-                audio_frames.append(audio_frame_bytes)
+                audio_bytes.append(audio_frame_bytes)
 
                 current_time = time.time() # timestamp
 
                 if current_time - last_calibration_time >= calibration_interval:
-                    self.interactive_recorder.calibrate_energy_threshold(audio_frames)
+                    self.interactive_recorder.calibrate_energy_threshold(audio_bytes)
                     self.interactive_recorder.save_audio(audio_frames, TEMP_AUDIO_FILE)
                     stt_text = self.ai_client.speech_to_text(TEMP_AUDIO_FILE)
 
