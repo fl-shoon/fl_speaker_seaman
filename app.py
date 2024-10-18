@@ -226,6 +226,7 @@ class VoiceAssistant:
         last_calibration_time = time.time()
         button_check_interval = 1.5 # 1 -> check buttons every 1 seconds
         detections = -1
+        self.interactive_recorder.start_stream()
 
         self.scheduled_conversation_flag = False
         
@@ -236,7 +237,7 @@ class VoiceAssistant:
                 if self.scheduled_conversation_flag:
                     return True, WakeWorkType.SCHEDULE
 
-                audio_frame = self.interactive_recorder.start_stream()
+                audio_frame = self.interactive_recorder.stream.read(self.interactive_recorder.CHUNK_SIZE, exception_on_overflow=False)
                 audio_frames.append(audio_frame)
                 # audio_frame = self.recorder.read()
                 audio_frame_bytes = np.array(audio_frame, dtype=np.int16).tobytes()
