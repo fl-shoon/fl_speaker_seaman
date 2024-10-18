@@ -1,5 +1,4 @@
 from etc.define import CHANNELS, RATE
-from collections import deque
 from contextlib import contextmanager
 from scipy.signal import butter, lfilter
 

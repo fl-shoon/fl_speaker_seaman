@@ -1,4 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor
 from etc.define import *
 from typing import List, Dict, AsyncGenerator
 
@@ -14,7 +13,6 @@ class OpenAIClient:
         self.retry_delay = 5
         self.http_client = None
         self.audio_player = None
-        self.executor = ThreadPoolExecutor(max_workers=4)
         self.gptContext = {"role": "system", "content": """あなたは役立つアシスタントです。日本語で返答してください。
                         ユーザーが薬を飲んだかどうか一度だけ確認してください。確認後は、他の話題に移ってください。
                         会話が自然に終了したと判断した場合は、返答の最後に '[END_OF_CONVERSATION]' というタグを付けてください。
@@ -29,7 +27,6 @@ class OpenAIClient:
     async def close(self):
         if self.http_client:
             await self.http_client.close()
-        self.executor.shutdown()
 
     async def service_openAI(self, endpoint: str, payload: Dict, files: Dict = None) -> AsyncGenerator[bytes, None]:
         headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -88,14 +85,19 @@ class OpenAIClient:
         if len(self.conversation_history) > 11:
             self.conversation_history = self.conversation_history[:1] + self.conversation_history[-10:]
 
-    async def speech_to_text(self, audio_file_path: str) -> AsyncGenerator[str, None]:
+    # async def speech_to_text(self, audio_file_path: str) -> AsyncGenerator[str, None]:
+    async def speech_to_text(self, audio_file_path: str) -> str:
         with open(audio_file_path, "rb") as audio_file:
             files = {"file": ("audio.wav", audio_file)}
             payload = {"model": "whisper-1", "response_format": "text", "language": "ja"}
+            response_text = ""
             
             async for chunk in self.service_openAI("audio/transcriptions", payload, files):
                 transcript_chunk = chunk.decode('utf-8')
-                yield transcript_chunk
+                # yield transcript_chunk
+                response_text += transcript_chunk
+
+            return response_text
 
     async def text_to_speech(self, text: str, output_file: str):
         payload = {"model": "tts-1-hd", "voice": "nova", "input": text, "response_format": "wav"}
@@ -112,10 +114,11 @@ class OpenAIClient:
             output_audio_file = f"{base}_response{ext}"
 
             # Transcribe audio (STT)
-            response_text = ""
-            async for transcript_chunk in self.speech_to_text(input_audio_file):
-                response_text += transcript_chunk
+            # response_text = ""
+            # async for transcript_chunk in self.speech_to_text(input_audio_file):
+            #     response_text += transcript_chunk
 
+            response_text = self.speech_to_text(input_audio_file)
             logger.info(f"Result from stt: {response_text}")
 
             # Generate response (Chat)
