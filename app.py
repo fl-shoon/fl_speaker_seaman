@@ -216,8 +216,8 @@ class VoiceAssistant:
             logger.error(f"Error in check_buttons: {e}")
             return None
         
-    async def listen_for_wake_word(self):
-        # self.recorder.start()
+    def listen_for_wake_word(self):
+        self.recorder.start()
         audio_frames = []
         # stt_text = ""
         calibration_interval = 5
@@ -225,7 +225,7 @@ class VoiceAssistant:
         last_calibration_time = time.time()
         button_check_interval = 1.5 # 1 -> check buttons every 1 seconds
         detections = -1
-        self.interactive_recorder.start_stream()
+        # self.interactive_recorder.start_stream()
 
         self.scheduled_conversation_flag = False
         
@@ -246,7 +246,7 @@ class VoiceAssistant:
                 if current_time - last_calibration_time >= calibration_interval:
                     self.interactive_recorder.calibrate_energy_threshold(audio_frames)
                     # self.interactive_recorder.save_audio(audio_frames, TEMP_AUDIO_FILE)
-                    # stt_text = self.ai_client.speech_to_text(TEMP_AUDIO_FILE)
+                    # stt_text = await self.ai_client.speech_to_text(TEMP_AUDIO_FILE)
 
                     # await asyncio.sleep(0.1)
 
@@ -424,7 +424,7 @@ async def main():
 
         while not exit_event.is_set():
             try:
-                res, trigger_type = await assistant.listen_for_wake_word()
+                res, trigger_type = assistant.listen_for_wake_word()
                 if res:
                     if trigger_type == WakeWorkType.TRIGGER:
                         await assistant.process_conversation()
